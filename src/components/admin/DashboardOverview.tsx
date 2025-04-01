@@ -3,7 +3,8 @@ import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAllJobs, getAllApplications, getAllCategories } from "@/services/jobService";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Briefcase, Users, BarChart3, FolderPlus } from "lucide-react";
+import { Briefcase, Users, BarChart3, FolderPlus, Filter } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 interface ApplicationCount {
   name: string;
@@ -16,6 +17,7 @@ const DashboardOverview = () => {
   const [categoryCount, setCategoryCount] = useState(0);
   const [applicationsByStatus, setApplicationsByStatus] = useState<ApplicationCount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [filter, setFilter] = useState("");
 
   useEffect(() => {
     const loadDashboardData = async () => {
@@ -56,8 +58,25 @@ const DashboardOverview = () => {
     loadDashboardData();
   }, []);
 
+  const filteredApplicationsByStatus = filter 
+    ? applicationsByStatus.filter(status => 
+        status.name.toLowerCase().includes(filter.toLowerCase())
+      )
+    : applicationsByStatus;
+
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <div className="relative w-[200px]">
+          <Filter className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="Filter charts..."
+            className="pl-8"
+          />
+        </div>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -123,9 +142,9 @@ const DashboardOverview = () => {
               <div className="flex h-full items-center justify-center">
                 <p>Loading chart data...</p>
               </div>
-            ) : applicationsByStatus.length > 0 ? (
+            ) : filteredApplicationsByStatus.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={applicationsByStatus}>
+                <BarChart data={filteredApplicationsByStatus}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
                   <YAxis />
@@ -135,7 +154,9 @@ const DashboardOverview = () => {
               </ResponsiveContainer>
             ) : (
               <div className="flex h-full items-center justify-center">
-                <p className="text-muted-foreground">No application data available</p>
+                <p className="text-muted-foreground">
+                  {filter ? "No matching application data" : "No application data available"}
+                </p>
               </div>
             )}
           </div>

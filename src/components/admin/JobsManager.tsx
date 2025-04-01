@@ -15,12 +15,11 @@ import {
   DialogDescription, 
   DialogFooter, 
   DialogHeader, 
-  DialogTitle,
-  DialogTrigger 
+  DialogTitle
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Plus, Edit, Trash2, Filter } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +35,7 @@ const JobsManager = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentJob, setCurrentJob] = useState<Job | null>(null);
+  const [filter, setFilter] = useState("");
   const { toast } = useToast();
   
   // Form state
@@ -152,8 +152,12 @@ const JobsManager = () => {
           description: "Job updated successfully",
         });
       } else {
-        // Add new job
-        await addJob(formData);
+        // Add new job - include current date for postedDate
+        const today = new Date().toLocaleDateString();
+        await addJob({
+          ...formData,
+          postedDate: today
+        });
         toast({
           title: "Success",
           description: "Job created successfully",
@@ -192,12 +196,30 @@ const JobsManager = () => {
       }
     }
   };
+
+  const filteredJobs = filter 
+    ? jobs.filter(job => 
+        job.title.toLowerCase().includes(filter.toLowerCase()) ||
+        job.company.toLowerCase().includes(filter.toLowerCase()) ||
+        job.category?.toLowerCase().includes(filter.toLowerCase()) ||
+        job.industry.toLowerCase().includes(filter.toLowerCase())
+      )
+    : jobs;
   
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold">Job Listings</h2>
         <div className="flex gap-2">
+          <div className="relative">
+            <Filter className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="Filter jobs..."
+              className="pl-8 w-[200px]"
+            />
+          </div>
           <Button onClick={loadJobs} variant="outline" size="sm">
             Refresh
           </Button>
@@ -211,7 +233,7 @@ const JobsManager = () => {
         <div className="flex justify-center py-8">
           <p>Loading jobs...</p>
         </div>
-      ) : jobs.length > 0 ? (
+      ) : filteredJobs.length > 0 ? (
         <div className="overflow-x-auto rounded-md border">
           <Table>
             <TableHeader>
@@ -220,13 +242,13 @@ const JobsManager = () => {
                 <TableHead>Company</TableHead>
                 <TableHead>Location</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead>Category</TableHead>
+                <TableHead>Industry/Category</TableHead>
                 <TableHead>Posted</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {jobs.map((job) => (
+              {filteredJobs.map((job) => (
                 <TableRow key={job.id}>
                   <TableCell>
                     <div className="font-medium">{job.title}</div>
@@ -235,7 +257,12 @@ const JobsManager = () => {
                   <TableCell>{job.company}</TableCell>
                   <TableCell>{job.location}</TableCell>
                   <TableCell>{job.jobType}</TableCell>
-                  <TableCell>{job.category || "—"}</TableCell>
+                  <TableCell>
+                    <div>{job.industry}</div>
+                    {job.category && job.category !== job.industry && (
+                      <div className="text-sm text-muted-foreground">{job.category}</div>
+                    )}
+                  </TableCell>
                   <TableCell>{job.postedDate}</TableCell>
                   <TableCell>
                     <div className="flex gap-2">
@@ -345,13 +372,28 @@ const JobsManager = () => {
               
               <div className="space-y-2">
                 <Label htmlFor="industry">Industry *</Label>
-                <Input 
-                  id="industry" 
-                  name="industry" 
+                <Select
                   value={formData.industry} 
-                  onChange={handleInputChange} 
-                  required 
-                />
+                  onValueChange={(value) => {
+                    handleSelectChange("industry", value);
+                    // Auto-set the category to match industry if empty
+                    if (!formData.category) {
+                      handleSelectChange("category", value);
+                    }
+                  }}
+                >
+                  <SelectTrigger id="industry">
+                    <SelectValue placeholder="Select an industry" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="technology">Technology</SelectItem>
+                    <SelectItem value="finance">Finance & Accounting</SelectItem>
+                    <SelectItem value="engineering">Engineering</SelectItem>
+                    <SelectItem value="sales">Sales & Marketing</SelectItem>
+                    <SelectItem value="executive">Executive Search</SelectItem>
+                    <SelectItem value="manufacturing">Manufacturing</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               
               <div className="space-y-2">

@@ -13,14 +13,47 @@ import {
   DialogDescription, 
   DialogFooter, 
   DialogHeader, 
-  DialogTitle,
-  DialogTrigger 
+  DialogTitle
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Filter } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+
+// Define industry data that matches IndustryCards
+const industryOptions = [
+  { 
+    id: 'technology', 
+    name: 'Technology', 
+    description: 'Software development, IT support, cybersecurity, and technical leadership roles.'
+  },
+  { 
+    id: 'finance', 
+    name: 'Finance & Accounting', 
+    description: 'Banking, accounting, financial analysis, and senior finance leadership positions.'
+  },
+  { 
+    id: 'engineering', 
+    name: 'Engineering', 
+    description: 'Civil, mechanical, electrical engineering and technical design positions.'
+  },
+  { 
+    id: 'sales', 
+    name: 'Sales & Marketing', 
+    description: 'Sales executives, digital marketing specialists, and brand management roles.'
+  },
+  { 
+    id: 'executive', 
+    name: 'Executive Search', 
+    description: 'C-suite, senior leadership, and board-level appointments across industries.'
+  },
+  { 
+    id: 'manufacturing', 
+    name: 'Manufacturing', 
+    description: 'Production management, quality control, and operations leadership positions.'
+  }
+];
 
 // Define category type
 interface Category {
@@ -34,6 +67,7 @@ const CategoriesManager = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [filter, setFilter] = useState("");
   const { toast } = useToast();
   
   // Form state
@@ -126,12 +160,49 @@ const CategoriesManager = () => {
       }
     }
   };
+
+  const addIndustryAsCategory = async (industry: typeof industryOptions[0]) => {
+    try {
+      await addCategory({
+        name: industry.name,
+        description: industry.description
+      });
+      toast({
+        title: "Success",
+        description: `Added ${industry.name} as a category`,
+      });
+      loadCategories();
+    } catch (error) {
+      console.error("Error adding industry as category:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add industry as category",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const filteredCategories = filter 
+    ? categories.filter(category => 
+        category.name.toLowerCase().includes(filter.toLowerCase()) ||
+        category.description.toLowerCase().includes(filter.toLowerCase())
+      )
+    : categories;
   
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold">Job Categories</h2>
         <div className="flex gap-2">
+          <div className="relative">
+            <Filter className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="Filter categories..."
+              className="pl-8 w-[200px]"
+            />
+          </div>
           <Button onClick={loadCategories} variant="outline" size="sm">
             Refresh
           </Button>
@@ -140,12 +211,31 @@ const CategoriesManager = () => {
           </Button>
         </div>
       </div>
+
+      <div className="bg-muted/50 p-4 rounded-md mb-6">
+        <h3 className="text-sm font-medium mb-2">Available Industry Templates</h3>
+        <div className="flex flex-wrap gap-2">
+          {industryOptions.map(industry => (
+            <Button 
+              key={industry.id}
+              variant="outline" 
+              size="sm"
+              onClick={() => addIndustryAsCategory(industry)}
+            >
+              {industry.name}
+            </Button>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          Click on an industry to add it as a category
+        </p>
+      </div>
       
       {isLoading ? (
         <div className="flex justify-center py-8">
           <p>Loading categories...</p>
         </div>
-      ) : categories.length > 0 ? (
+      ) : filteredCategories.length > 0 ? (
         <div className="overflow-x-auto rounded-md border">
           <Table>
             <TableHeader>
@@ -157,7 +247,7 @@ const CategoriesManager = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {categories.map((category) => (
+              {filteredCategories.map((category) => (
                 <TableRow key={category.id}>
                   <TableCell className="font-medium">{category.name}</TableCell>
                   <TableCell>{category.description}</TableCell>
