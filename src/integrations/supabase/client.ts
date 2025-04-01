@@ -37,9 +37,9 @@ export const checkStorageBuckets = async () => {
       return { success: false, error };
     }
     
-    // Check for the bucket with case-insensitive comparison
+    // Check for the bucket with the correct name
     const resumesBucketExists = buckets?.some(bucket => 
-      bucket.id.toLowerCase() === 'resumes'.toLowerCase()
+      bucket.name === 'Resumes Storage' || bucket.id === 'resumes'
     );
     
     if (!resumesBucketExists) {
