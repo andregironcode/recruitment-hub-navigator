@@ -3,7 +3,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Briefcase, Clock, Building } from 'lucide-react';
+import { MapPin, Briefcase, Clock, Building, Tag } from 'lucide-react';
 
 export interface Job {
   id: number;
@@ -16,6 +16,7 @@ export interface Job {
   description: string;
   postedDate: string;
   featured: boolean;
+  category?: string; // Optional category field
 }
 
 interface JobListProps {
@@ -53,10 +54,15 @@ const JobList: React.FC<JobListProps> = ({ jobs, loading = false }) => {
             <CardContent className="p-6">
               <div className="flex justify-between flex-wrap gap-4">
                 <div>
-                  <div className="flex items-start gap-2">
+                  <div className="flex items-start gap-2 flex-wrap">
                     <h3 className="text-xl font-semibold text-recruitment-dark">{job.title}</h3>
                     {job.featured && (
-                      <Badge className="bg-recruitment-accent text-white">Featured</Badge>
+                      <Badge className="bg-recruitment-primary text-white">Featured</Badge>
+                    )}
+                    {job.category && (
+                      <Badge variant="outline" className="flex items-center border-recruitment-primary text-recruitment-primary">
+                        <Tag size={14} className="mr-1" /> {job.category}
+                      </Badge>
                     )}
                   </div>
                   <div className="flex items-center text-gray-500 mt-2">
