@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -30,7 +29,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase, initializeStorageBuckets } from '@/integrations/supabase/client';
+import { supabase, checkStorageBuckets } from '@/integrations/supabase/client';
 
 const JobDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -47,19 +46,18 @@ const JobDetail = () => {
   const [cvFile, setCvFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fileUploading, setFileUploading] = useState(false);
-  const [bucketInitialized, setBucketInitialized] = useState(false);
+  const [bucketAccessible, setBucketAccessible] = useState(false);
 
   useEffect(() => {
-    // Initialize storage buckets when component loads
-    const initBucket = async () => {
-      const result = await initializeStorageBuckets();
-      setBucketInitialized(result.success);
+    const checkBucket = async () => {
+      const result = await checkStorageBuckets();
+      setBucketAccessible(result.success);
       if (!result.success) {
-        console.warn('Storage initialization failed. File uploads may not work correctly.', result.error);
+        console.warn('Storage bucket check failed:', result.error);
       }
     };
     
-    initBucket();
+    checkBucket();
 
     const fetchJob = async () => {
       if (!id) return;
@@ -107,17 +105,14 @@ const JobDetail = () => {
     try {
       console.log('Starting file upload for', file.name);
       
-      // Ensure bucket is initialized before upload
-      if (!bucketInitialized) {
-        console.log('Initializing bucket before upload...');
-        const initResult = await initializeStorageBuckets();
-        if (!initResult.success) {
-          throw new Error(`Failed to initialize storage bucket: ${initResult.error?.message || 'Unknown error'}`);
+      if (!bucketAccessible) {
+        const checkResult = await checkStorageBuckets();
+        if (!checkResult.success) {
+          throw new Error(`Storage bucket not accessible: ${checkResult.error?.message || 'Unknown error'}`);
         }
-        setBucketInitialized(true);
+        setBucketAccessible(true);
       }
       
-      // Create a unique file path with timestamp and random string
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
       const filePath = `${fileName}`;
@@ -134,7 +129,7 @@ const JobDetail = () => {
         console.error('Error uploading file:', uploadError);
         
         if (uploadError.message.includes('The resource was not found')) {
-          throw new Error('Storage bucket "resumes" not found. Please ensure the bucket exists.');
+          throw new Error('Storage bucket "resumes" not found. Please contact support.');
         }
         
         if (uploadError.message.includes('row-level security policy')) {
@@ -148,7 +143,6 @@ const JobDetail = () => {
         throw new Error('Upload failed - no data returned from server');
       }
 
-      // Get a public URL for the file
       const { data: publicUrlData } = supabase.storage
         .from('resumes')
         .getPublicUrl(uploadData.path);
@@ -180,7 +174,6 @@ const JobDetail = () => {
     setIsSubmitting(true);
     
     try {
-      // Upload the CV file to storage if provided
       let resumeUrl = '';
       if (cvFile) {
         try {
@@ -197,7 +190,6 @@ const JobDetail = () => {
         }
       }
       
-      // Submit the application
       await submitApplication({
         jobId: parseInt(id, 10),
         jobTitle: job.title,
@@ -278,7 +270,6 @@ const JobDetail = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Main content */}
             <div className="lg:col-span-2">
               <Card>
                 <CardContent className="p-8">
@@ -322,7 +313,6 @@ const JobDetail = () => {
               </Card>
             </div>
 
-            {/* Sidebar */}
             <div>
               <Card className="sticky top-6">
                 <CardContent className="p-6">
@@ -364,7 +354,6 @@ const JobDetail = () => {
         </div>
       </div>
 
-      {/* Job Application Dialog */}
       <Dialog open={isApplyDialogOpen} onOpenChange={setIsApplyDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>

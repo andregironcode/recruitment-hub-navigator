@@ -26,10 +26,10 @@ export const supabase = createClient<Database>(
   }
 );
 
-// Initialize storage buckets if they don't exist
-export const initializeStorageBuckets = async () => {
+// Check if storage buckets are accessible
+export const checkStorageBuckets = async () => {
   try {
-    // Explicitly create resumes bucket via API call
+    // We don't attempt to create the bucket anymore, just check if we can access it
     const { data: buckets, error } = await supabase.storage.listBuckets();
     
     if (error) {
@@ -40,30 +40,17 @@ export const initializeStorageBuckets = async () => {
     const resumesBucketExists = buckets?.some(bucket => bucket.id === 'resumes');
     
     if (!resumesBucketExists) {
-      console.log('Creating resumes bucket...');
-      const { error: createError } = await supabase.storage.createBucket('resumes', {
-        public: true, // Make the bucket public so we can access files directly
-        fileSizeLimit: 10485760, // 10MB limit
-        allowedMimeTypes: [
-          'application/pdf',
-          'application/msword',
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        ]
-      });
-      
-      if (createError) {
-        console.error('Error creating resumes bucket:', createError);
-        return { success: false, error: createError };
-      }
-      
-      console.log('Resumes bucket created successfully');
-      return { success: true };
+      console.warn('Resumes bucket does not exist. This should have been created via SQL migration.');
+      return { 
+        success: false, 
+        error: new Error('Resumes bucket does not exist. File uploads will not work.')
+      };
     } else {
-      console.log('Resumes bucket already exists');
+      console.log('Resumes bucket exists and is accessible');
       return { success: true };
     }
   } catch (error) {
-    console.error('Failed to initialize storage buckets:', error);
+    console.error('Failed to check storage buckets:', error);
     return { success: false, error };
   }
 };
