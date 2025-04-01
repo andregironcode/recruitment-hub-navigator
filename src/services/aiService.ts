@@ -35,13 +35,17 @@ export async function analyzeResume({
       applicantId 
     });
     
+    // Get the Supabase anon key from the client instead of using process.env
+    const { data: { session } } = await supabase.auth.getSession();
+    const supabaseKey = session?.access_token || await getSBPublicKey();
+    
     const response = await fetch(
       'https://rtuzdeaxmpikwuvplcbh.supabase.co/functions/v1/analyze-resume',
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY || ''}`,
+          'Authorization': `Bearer ${supabaseKey}`,
         },
         body: JSON.stringify({
           resumeUrl,
@@ -130,6 +134,18 @@ export async function analyzeResume({
       fallback: true
     };
   }
+}
+
+// Helper function to get the public Supabase key if the session isn't available
+async function getSBPublicKey(): Promise<string> {
+  // Try to get the public key from the window object if available
+  if (typeof window !== 'undefined' && (window as any).SUPABASE_ANON_KEY) {
+    return (window as any).SUPABASE_ANON_KEY;
+  }
+  
+  // Fallback key - this should be replaced with the actual public key if needed
+  // This is safe to include in the client code as it's a public key
+  return 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ0dXpkZWF4bXBpa3d1dnBsY2JoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM1MDYzMTIsImV4cCI6MjA1OTA4MjMxMn0.Ame9c-wN0mL45G_x01pcY0G1ryY1elR5LuUg7BWYJhU';
 }
 
 export async function getExistingAnalysis(applicationId: number): Promise<ResumeAnalysis | null> {

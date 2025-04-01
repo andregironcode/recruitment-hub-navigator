@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Job } from '@/components/jobs/JobList';
 import { JobSearchFilters } from '@/components/jobs/JobSearch';
@@ -339,6 +340,17 @@ export const updateApplicationStatus = async (id: number, status: string): Promi
 /**
  * Submit job application
  */
+export interface ApplicationSubmission {
+  jobId: number;
+  jobTitle: string;
+  applicantName: string;
+  email: string;
+  phone?: string;
+  resumeUrl?: string;
+  resumeContent?: string;
+  coverLetter?: string;
+}
+
 export async function submitApplication({
   jobId,
   jobTitle,
