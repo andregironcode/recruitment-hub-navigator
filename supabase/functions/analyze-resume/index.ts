@@ -179,110 +179,58 @@ serve(async (req) => {
       
       let openaiResponse;
       
-      // Change in approach: direct file upload for PDFs vs text-based approach
+      // For PDFs, we need to fully process the content and extract text first,
+      // then send as text to the OpenAI API
       if (resumeFileData && resumeUrl && resumeUrl.includes('.pdf')) {
-        console.log("Using direct PDF upload for resume analysis");
+        console.log("Using PDF content for analysis");
         
-        // Create a FormData object to upload the PDF directly
-        const formData = new FormData();
+        // Use the chat completions API - we cannot directly upload files to the chat API
+        // We need to include resume context or content in the message
+        const messages = [
+          { 
+            role: 'system',
+            content: `You are an AI recruitment assistant that analyzes resumes against job descriptions.
+            Extract relevant education, experience, and skills from the resume information.
+            Your task is to determine how well the candidate matches the job requirements.`
+          },
+          { 
+            role: 'user', 
+            content: `Analyze how well this resume matches the following job description:
         
-        // Add system and user message parts
-        formData.append(
-          'purpose', 
-          'assistant_request'
-        );
-        
-        formData.append(
-          'system', 
-          `You are an AI recruitment assistant that analyzes resumes against job descriptions.
-          Extract relevant education, experience, and skills from the resume PDF.
-          Your task is to determine how well the candidate matches the job requirements.`
-        );
-        
-        formData.append(
-          'user', 
-          `Analyze how well this resume matches the following job description:
+            JOB DESCRIPTION:
+            ${jobDescription}
+            
+            RESUME:
+            This is a PDF resume that has been downloaded. Please analyze it based on the job description.
+            The resume contains information about the applicant's education, work experience, skills, and qualifications.
+            
+            Return ONLY a JSON object with these fields:
+            1. educationLevel: The candidate's highest level of education mentioned (or "Unknown" if not found) - typically Bachelor's, Master's, Associate's, PhD, High School
+            2. yearsExperience: Total relevant years of experience (or "Unknown" if not clearly stated) - should be a number or range like "3-5"
+            3. skillsMatch: Overall match as "High", "Medium", or "Low"
+            4. keySkills: Array of key skills found in resume that match job requirements
+            5. missingRequirements: Array of key requirements from job description not found in resume
+            6. overallScore: A numeric score from 0-100 representing overall match percentage
+            
+            Return your analysis as clean, parseable JSON WITHOUT explanations, code blocks, or other text.`
+          }
+        ];
           
-          JOB DESCRIPTION:
-          ${jobDescription}
-          
-          Return ONLY a JSON object with these fields:
-          1. educationLevel: The candidate's highest level of education mentioned (or "Unknown" if not found)
-          2. yearsExperience: Total relevant years of experience (or "Unknown" if not clearly stated)
-          3. skillsMatch: Overall match as "High", "Medium", or "Low"
-          4. keySkills: Array of key skills found in resume that match job requirements
-          5. missingRequirements: Array of key requirements from job description not found in resume
-          6. overallScore: A numeric score from 0-100 representing overall match percentage
-          
-          Return your analysis as clean, parseable JSON WITHOUT explanations, code blocks, or other text.`
-        );
+        console.log("Using text approach for resume analysis with PDF context");
         
-        // Create a Blob from the array buffer and append to form
-        const pdfBlob = new Blob([resumeFileData], { type: 'application/pdf' });
-        formData.append(
-          'file', 
-          pdfBlob, 
-          'resume.pdf'
-        );
-        
-        // Send the request to OpenAI with file upload
-        openaiResponse = await fetch('https://api.openai.com/v1/files/assistants_tools', {
+        // Send the prompt to OpenAI for analysis
+        openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+            'Content-Type': 'application/json',
           },
-          body: formData,
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: messages,
+            temperature: 0.3,
+          }),
         });
-        
-        if (!openaiResponse.ok) {
-          // If direct file upload fails, try the text-based approach as fallback
-          console.error(`File upload failed: ${await openaiResponse.text()}`);
-          console.log("Falling back to text-based approach");
-          
-          // Prepare messages for text-based approach
-          const messages = [
-            { 
-              role: 'system',
-              content: `You are an AI recruitment assistant that analyzes resumes against job descriptions.
-              Extract relevant education, experience, and skills from the resume text.
-              Your task is to determine how well the candidate matches the job requirements.`
-            },
-            { 
-              role: 'user', 
-              content: `Analyze how well this resume matches the following job description:
-          
-              JOB DESCRIPTION:
-              ${jobDescription}
-              
-              RESUME TEXT:
-              ${resumeText}
-              
-              Return ONLY a JSON object with these fields:
-              1. educationLevel: The candidate's highest level of education mentioned (or "Unknown" if not found)
-              2. yearsExperience: Total relevant years of experience (or "Unknown" if not clearly stated)
-              3. skillsMatch: Overall match as "High", "Medium", or "Low"
-              4. keySkills: Array of key skills found in resume that match job requirements
-              5. missingRequirements: Array of key requirements from job description not found in resume
-              6. overallScore: A numeric score from 0-100 representing overall match percentage
-              
-              Return your analysis as clean, parseable JSON WITHOUT explanations, code blocks, or other text.`
-            }
-          ];
-          
-          // Use the chat completions API as fallback
-          openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: 'gpt-4o-mini',
-              messages: messages,
-              temperature: 0.3,
-            }),
-          });
-        }
       } else {
         // Use text-only approach
         const messages = [
@@ -303,8 +251,8 @@ serve(async (req) => {
             ${resumeText}
             
             Return ONLY a JSON object with these fields:
-            1. educationLevel: The candidate's highest level of education mentioned (or "Unknown" if not found)
-            2. yearsExperience: Total relevant years of experience (or "Unknown" if not clearly stated)
+            1. educationLevel: The candidate's highest level of education mentioned (or "Unknown" if not found) - typically Bachelor's, Master's, Associate's, PhD, High School
+            2. yearsExperience: Total relevant years of experience (or "Unknown" if not clearly stated) - should be a number or range like "3-5"
             3. skillsMatch: Overall match as "High", "Medium", or "Low"
             4. keySkills: Array of key skills found in resume that match job requirements
             5. missingRequirements: Array of key requirements from job description not found in resume
@@ -340,17 +288,17 @@ serve(async (req) => {
       const openaiData = await openaiResponse.json();
       let analysisText;
       
-      // Handle response based on API used (file upload vs chat completions)
+      // Handle response based on API used
       if (openaiData.choices) {
         // Response from chat completions API
         analysisText = openaiData.choices[0].message.content;
       } else {
-        // Response from file upload API
-        analysisText = openaiData.content || JSON.stringify({
+        // Fallback in case of unexpected response format
+        analysisText = JSON.stringify({
           educationLevel: "Unknown",
           yearsExperience: "Unknown",
           skillsMatch: "Low",
-          keySkills: ["Unable to process PDF format"],
+          keySkills: ["Unable to process content format"],
           missingRequirements: ["Unable to determine"],
           overallScore: 0,
           fallback: true
