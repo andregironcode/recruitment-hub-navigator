@@ -74,52 +74,51 @@ serve(async (req) => {
           console.log(`File content type: ${contentType}`);
           
           if (contentType?.includes('application/pdf')) {
-              // FIXED: Use the proper OpenAI API for PDF text extraction
-              try {
-                const pdfBytes = await response.arrayBuffer();
-                const pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(pdfBytes)));
-                
-                // Use text extraction from PDF using OpenAI's API
-                const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-                  method: 'POST',
-                  headers: {
-                    'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    model: 'gpt-4o-mini',
-                    messages: [
-                      { 
-                        role: 'user', 
-                        content: [
-                          { 
-                            type: 'text', 
-                            text: 'Extract all text content from this PDF resume. Format it clearly maintaining the structure.' 
-                          },
-                          {
-                            type: 'image_url',
-                            image_url: {
-                              url: `data:application/pdf;base64,${pdfBase64}`
-                            }
-                          }
-                        ]
-                      }
-                    ]
-                  }),
-                });
-                
-                if (!openaiResponse.ok) {
-                  const errorText = await openaiResponse.text();
-                  throw new Error(`OpenAI error: ${errorText}`);
-                }
-                
-                const openaiData = await openaiResponse.json();
-                resumeText = openaiData.choices[0].message.content;
-                console.log(`Successfully extracted text from PDF, length: ${resumeText.length}`);
-              } catch (error) {
-                console.error('Error processing PDF:', error);
-                throw new Error(`Failed to process PDF: ${error.message}`);
+            // For PDF files, use regular text extraction via OpenAI
+            // This avoids the vision API which is causing errors
+            try {
+              const pdfArrayBuffer = await response.arrayBuffer();
+              const pdfBytes = new Uint8Array(pdfArrayBuffer);
+              
+              // Convert the first portion of the PDF to base64 to analyze
+              // We limit the size to avoid hitting API limits
+              const partialPdf = pdfBytes.slice(0, Math.min(pdfBytes.length, 1000000));
+              const pdfBase64 = btoa(String.fromCharCode(...partialPdf));
+              
+              // Use OpenAI's API for text extraction
+              const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  model: 'gpt-4o-mini',
+                  messages: [
+                    { 
+                      role: 'user', 
+                      content: `I have a base64 encoded PDF that represents a resume. 
+                      I need you to extract the plain text content from this PDF.
+                      Here's the base64 encoded content (first 1MB only):
+                      ${pdfBase64}`
+                    }
+                  ],
+                  temperature: 0.1,
+                }),
+              });
+              
+              if (!openaiResponse.ok) {
+                const errorText = await openaiResponse.text();
+                throw new Error(`OpenAI error: ${errorText}`);
               }
+              
+              const openaiData = await openaiResponse.json();
+              resumeText = openaiData.choices[0].message.content;
+              console.log(`Successfully extracted text from PDF, length: ${resumeText.length}`);
+            } catch (error) {
+              console.error('Error processing PDF:', error);
+              throw new Error(`Failed to process PDF: ${error.message}`);
+            }
           } else if (contentType?.includes('text')) {
             // For text files, just get the content directly
             resumeText = await response.text();
