@@ -1,5 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/components/ui/use-toast';
 
 interface ResumeAnalysisParams {
   resumeUrl?: string;
@@ -73,6 +74,23 @@ export async function analyzeResume({
         fallback: true,
         debugInfo: 'Missing required parameters'
       };
+    }
+    
+    // Log important parameters for debugging
+    console.log('Sending resume analysis request with:', {
+      resumeUrlProvided: !!resumeUrl,
+      resumeContentProvided: !!resumeContent,
+      resumeContentLength: resumeContent?.length || 0,
+      jobDescriptionLength: jobDescription.length,
+      forceUpdate
+    });
+    
+    // Display a toast message for users to know the analysis is in progress
+    if (forceUpdate) {
+      toast({
+        title: 'Re-analyzing resume',
+        description: 'Sending resume to AI for a fresh analysis...',
+      });
     }
     
     const response = await fetch(
@@ -174,7 +192,8 @@ export async function getExistingAnalysis(applicationId: number): Promise<Resume
       keySkills: data.key_skills || [],
       missingRequirements: data.missing_requirements || [],
       overallScore: data.overall_score || 0,
-      fallback: data.fallback || false
+      fallback: data.fallback || false,
+      debugInfo: null
     };
   } catch (error) {
     console.error('Error in getExistingAnalysis:', error);

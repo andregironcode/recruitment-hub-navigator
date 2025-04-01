@@ -55,8 +55,6 @@ serve(async (req) => {
     }
     
     let resumeText = '';
-    let pdfBase64 = '';
-    let useVisionAPI = false;
     
     // Extract text from resume if URL is provided
     if (resumeUrl) {
@@ -64,32 +62,25 @@ serve(async (req) => {
       
       // Check if it's a Supabase storage URL
       if (resumeUrl.includes('supabase.co/storage/v1/object/public')) {
-        console.log('Detected Supabase signed URL');
+        console.log('Detected Supabase storage URL');
         
         try {
-          const response = await fetch(resumeUrl);
+          // Just get the content type, we'll pass the URL directly to OpenAI
+          const headResponse = await fetch(resumeUrl, { method: 'HEAD' });
           
-          if (!response.ok) {
-            throw new Error(`Failed to fetch resume: ${response.statusText}`);
+          if (!headResponse.ok) {
+            throw new Error(`Failed to access resume: ${headResponse.statusText}`);
           }
           
-          const contentType = response.headers.get('content-type');
+          const contentType = headResponse.headers.get('content-type');
           console.log(`File content type: ${contentType}`);
           
           if (contentType?.includes('application/pdf')) {
-            try {
-              console.log("Attempting to process PDF directly using Vision API");
-              
-              // For PDFs, we'll just use their URL directly with the vision API
-              // instead of trying to extract text, which was causing errors
-              useVisionAPI = true;
-              resumeText = "PDF content will be processed directly with Vision API";
-            } catch (error) {
-              console.error('Error in PDF handling approach:', error);
-              resumeText = `Error processing PDF: ${error.message}`;
-            }
+            console.log("PDF detected, will pass URL directly to OpenAI");
+            resumeText = "PDF document will be processed directly";
           } else if (contentType?.includes('text')) {
             // For text files, just get the content directly
+            const response = await fetch(resumeUrl);
             resumeText = await response.text();
             console.log(`Successfully extracted text, length: ${resumeText.length}`);
           } else {
@@ -97,7 +88,7 @@ serve(async (req) => {
             console.log(resumeText);
           }
         } catch (error) {
-          console.error('Error fetching resume from signed URL:', error);
+          console.error('Error accessing resume from URL:', error);
           resumeText = `Error accessing resume file: ${error.message}`;
         }
       } else if (resumeUrl.startsWith('blob:')) {
@@ -118,9 +109,9 @@ serve(async (req) => {
     
     console.log(`Resume text preview (first 100 chars): ${resumeText.substring(0, 100)}`);
     
-    // If we have no meaningful text to analyze and we're not using Vision API, return a fallback analysis
-    if ((!resumeText || resumeText.includes('Error accessing resume file') || resumeText.length < 50) && !useVisionAPI) {
-      console.log('Insufficient resume text and not using Vision API, generating fallback analysis');
+    // If we have no meaningful text to analyze, return a fallback analysis
+    if (!resumeUrl && (!resumeText || resumeText.includes('Error accessing resume file') || resumeText.length < 50)) {
+      console.log('Insufficient resume text, generating fallback analysis');
       
       const fallbackAnalysis = {
         educationLevel: "Unknown",
@@ -176,47 +167,38 @@ serve(async (req) => {
     // Prepare the messages for OpenAI to analyze the resume against job description
     let messages = [];
     
-    if (useVisionAPI && resumeUrl) {
-      // Use vision API with direct URL attachment
+    if (resumeUrl && resumeUrl.includes('.pdf')) {
+      // If we have a PDF URL, use it directly with the OpenAI API
       messages = [
         { 
           role: 'system', 
           content: `You are an AI recruitment assistant that analyzes resumes against job descriptions.
-          Analyze the resume PDF that will be attached to this message, comparing it against the job description.
+          Analyze the resume PDF URL that will be provided in the user message.
           Extract relevant education, experience, and skills.
           Your task is to determine how well the candidate matches the requirements.`
         },
         { 
           role: 'user', 
-          content: [
-            { 
-              type: 'text', 
-              text: `Analyze how well this resume matches the following job description:
-              
-              JOB DESCRIPTION:
-              ${jobDescription}
-              
-              Analyze the resume PDF and return ONLY a JSON object with these fields:
-              1. educationLevel: The candidate's highest level of education mentioned (or "Unknown" if not found)
-              2. yearsExperience: Total relevant years of experience (or "Unknown" if not clearly stated)
-              3. skillsMatch: Overall match as "High", "Medium", or "Low"
-              4. keySkills: Array of key skills found in resume that match job requirements
-              5. missingRequirements: Array of key requirements from job description not found in resume
-              6. overallScore: A numeric score from 0-100 representing overall match percentage
-              
-              Return your analysis as clean, parseable JSON WITHOUT explanations, code blocks, or other text.`
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: resumeUrl
-              }
-            }
-          ]
+          content: `Analyze how well this resume matches the following job description:
+      
+          JOB DESCRIPTION:
+          ${jobDescription}
+          
+          RESUME PDF URL: ${resumeUrl}
+          
+          Return ONLY a JSON object with these fields:
+          1. educationLevel: The candidate's highest level of education mentioned (or "Unknown" if not found)
+          2. yearsExperience: Total relevant years of experience (or "Unknown" if not clearly stated)
+          3. skillsMatch: Overall match as "High", "Medium", or "Low"
+          4. keySkills: Array of key skills found in resume that match job requirements
+          5. missingRequirements: Array of key requirements from job description not found in resume
+          6. overallScore: A numeric score from 0-100 representing overall match percentage
+          
+          Return your analysis as clean, parseable JSON WITHOUT explanations, code blocks, or other text.`
         }
       ];
       
-      console.log("Using vision API for resume analysis with PDF URL");
+      console.log("Using direct PDF URL for resume analysis");
     } else {
       // Use text-only approach
       messages = [
@@ -262,7 +244,7 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: useVisionAPI ? 'gpt-4o' : 'gpt-4o-mini', // Use gpt-4o for vision API
+          model: 'gpt-3.5-turbo',  // Using gpt-3.5-turbo instead of gpt-4o
           messages: messages,
           temperature: 0.3,
         }),
