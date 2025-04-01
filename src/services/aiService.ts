@@ -1,123 +1,131 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
+interface ResumeAnalysisParams {
+  resumeUrl?: string;
+  resumeContent?: string;
+  jobDescription: string;
+  jobId?: number;
+  applicantId?: number;
+}
+
 export interface ResumeAnalysis {
-  overallScore: number;
+  educationLevel: string;
+  yearsExperience: string;
   skillsMatch: string;
   keySkills: string[];
   missingRequirements: string[];
-  educationLevel: string;
-  yearsExperience: string;
+  overallScore: number;
   fallback?: boolean;
 }
 
-/**
- * Analyze a resume against a job description
- */
-export const analyzeResume = async (
-  resumeUrl: string, 
-  jobDescription: string,
-  jobId?: number,
-  applicantId?: number
-): Promise<ResumeAnalysis> => {
+export async function analyzeResume({
+  resumeUrl,
+  resumeContent,
+  jobDescription,
+  jobId,
+  applicantId
+}: ResumeAnalysisParams): Promise<ResumeAnalysis> {
   try {
-    // For blob URLs, we can't send the actual content to the edge function
-    // So we'll extract a preview of the file content when possible
-    let resumeContent = null;
+    console.log('Analyzing resume with params:', { resumeUrl: resumeUrl?.substring(0, 50), jobId, applicantId });
     
-    if (resumeUrl && resumeUrl.startsWith('blob:')) {
-      try {
-        // Log this limitation
-        console.log('Attempting to extract content from blob URL:', resumeUrl);
-        console.error('Blob URLs cannot be processed by the server. Please upload files to storage first.');
-      } catch (err) {
-        console.warn('Unable to extract content from blob URL:', err);
+    const response = await fetch(
+      'https://rtuzdeaxmpikwuvplcbh.supabase.co/functions/v1/analyze-resume',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY || ''}`,
+        },
+        body: JSON.stringify({
+          resumeUrl,
+          resumeContent,
+          jobDescription,
+          jobId,
+          applicantId
+        }),
       }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error analyzing resume:', errorText);
+      throw new Error(`Failed to analyze resume: ${errorText}`);
     }
 
-    const { data, error } = await supabase.functions.invoke('analyze-resume', {
-      body: {
-        resumeUrl,
-        resumeContent,
-        jobDescription,
-        jobId,
-        applicantId
-      }
-    });
+    const data = await response.json();
+    return {
+      educationLevel: data.educationLevel || 'Not available',
+      yearsExperience: data.yearsExperience || 'Not available',
+      skillsMatch: data.skillsMatch || 'Low',
+      keySkills: data.keySkills || [],
+      missingRequirements: data.missingRequirements || [],
+      overallScore: data.overallScore || 0,
+      fallback: data.fallback
+    };
+  } catch (error) {
+    console.error('Error in analyzeResume function:', error);
+    // Return a default analysis when the API fails
+    return {
+      educationLevel: 'Not available',
+      yearsExperience: 'Not available',
+      skillsMatch: 'Low',
+      keySkills: ['Unable to analyze resume'],
+      missingRequirements: ['Unable to analyze resume'],
+      overallScore: 0,
+      fallback: true
+    };
+  }
+}
+
+export async function getExistingAnalysis(applicationId: number): Promise<ResumeAnalysis | null> {
+  try {
+    const { data, error } = await supabase
+      .from('application_analyses')
+      .select('*')
+      .eq('application_id', applicationId)
+      .single();
 
     if (error) {
-      console.error('Error analyzing resume:', error);
-      throw new Error('Failed to analyze resume');
+      console.error('Error fetching analysis:', error);
+      return null;
     }
 
-    // Check if we got an error response from the edge function
-    if (data.error) {
-      console.error('Error from edge function:', data.error);
-      throw new Error(data.error);
+    if (!data) {
+      return null;
     }
 
-    return data as ResumeAnalysis;
-  } catch (err) {
-    console.error('Resume analysis error:', err);
-    throw err;
-  }
-};
-
-/**
- * Get stored analysis for an application
- */
-export const getApplicationAnalysis = async (applicationId: number): Promise<ResumeAnalysis | null> => {
-  const { data, error } = await supabase
-    .from('application_analyses')
-    .select('*')
-    .eq('application_id', applicationId)
-    .single();
-
-  if (error) {
-    console.error('Error fetching application analysis:', error);
+    return {
+      educationLevel: data.education_level || 'Not available',
+      yearsExperience: data.years_experience || 'Not available',
+      skillsMatch: data.skills_match || 'Low',
+      keySkills: data.key_skills || [],
+      missingRequirements: data.missing_requirements || [],
+      overallScore: data.overall_score || 0,
+      fallback: data.fallback
+    };
+  } catch (error) {
+    console.error('Error in getExistingAnalysis:', error);
     return null;
   }
+}
 
-  if (!data) return null;
+export async function getJobDescription(jobId: number): Promise<string> {
+  try {
+    const { data, error } = await supabase
+      .from('jobs')
+      .select('description')
+      .eq('id', jobId)
+      .single();
 
-  return {
-    educationLevel: data.education_level,
-    yearsExperience: data.years_experience,
-    skillsMatch: data.skills_match,
-    keySkills: data.key_skills,
-    missingRequirements: data.missing_requirements,
-    overallScore: data.overall_score,
-    fallback: data.fallback
-  };
-};
+    if (error) {
+      console.error('Error fetching job description:', error);
+      return '';
+    }
 
-/**
- * Get analyses for all applications for a job
- */
-export const getJobApplicationsAnalyses = async (jobId: number): Promise<Record<number, ResumeAnalysis>> => {
-  const { data, error } = await supabase
-    .from('application_analyses')
-    .select('*')
-    .eq('job_id', jobId);
-
-  if (error) {
-    console.error('Error fetching job application analyses:', error);
-    return {};
+    return data.description || '';
+  } catch (error) {
+    console.error('Error in getJobDescription:', error);
+    return '';
   }
-
-  const analysesMap: Record<number, ResumeAnalysis> = {};
-  
-  data.forEach(item => {
-    analysesMap[item.application_id] = {
-      educationLevel: item.education_level,
-      yearsExperience: item.years_experience,
-      skillsMatch: item.skills_match,
-      keySkills: item.key_skills,
-      missingRequirements: item.missing_requirements,
-      overallScore: item.overall_score,
-      fallback: item.fallback
-    };
-  });
-
-  return analysesMap;
-};
+}

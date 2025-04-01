@@ -93,6 +93,8 @@ const JobDetail = () => {
   const uploadFileToStorage = async (file: File): Promise<string> => {
     setFileUploading(true);
     try {
+      console.log('Starting file upload for', file.name);
+      
       // Create a unique file path with timestamp and random string
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
@@ -103,6 +105,7 @@ const JobDetail = () => {
       const resumeBucket = buckets?.find(b => b.name === 'resumes');
       
       if (!resumeBucket) {
+        console.log('Resume bucket not found, creating...');
         const { error: createError } = await supabase.storage.createBucket('resumes', {
           public: false,
           fileSizeLimit: 10485760, // 10MB
@@ -112,19 +115,28 @@ const JobDetail = () => {
           console.error('Error creating bucket:', createError);
           throw new Error('Failed to create storage bucket');
         }
+        console.log('Bucket created successfully');
       }
 
       // Upload file
+      console.log('Uploading file to', filePath);
       const { error: uploadError } = await supabase.storage
         .from('resumes')
         .upload(filePath, file);
 
       if (uploadError) {
         console.error('Error uploading file:', uploadError);
-        throw new Error('Failed to upload resume');
+        
+        // Special handling for specific error codes
+        if (uploadError.message.includes('row-level security policy')) {
+          throw new Error('Permission denied: Cannot upload file due to security restrictions. Please contact an administrator.');
+        }
+        
+        throw new Error('Failed to upload resume: ' + uploadError.message);
       }
 
       // Get URL for the uploaded file
+      console.log('Getting signed URL for file');
       const { data: urlData } = await supabase.storage
         .from('resumes')
         .createSignedUrl(filePath, 60 * 60 * 24 * 30); // 30 days expiry
@@ -133,9 +145,15 @@ const JobDetail = () => {
         throw new Error('Failed to get resume URL');
       }
 
+      console.log('File uploaded successfully, URL obtained');
       return urlData.signedUrl;
     } catch (error) {
       console.error('File upload error:', error);
+      toast({
+        title: 'Upload Error',
+        description: error instanceof Error ? error.message : 'An unknown error occurred during file upload',
+        variant: 'destructive'
+      });
       throw error;
     } finally {
       setFileUploading(false);
@@ -195,7 +213,7 @@ const JobDetail = () => {
       console.error('Error submitting application:', error);
       toast({
         title: 'Error',
-        description: 'Failed to submit your application. Please try again.',
+        description: error instanceof Error ? error.message : 'Failed to submit your application. Please try again.',
         variant: 'destructive'
       });
     } finally {
