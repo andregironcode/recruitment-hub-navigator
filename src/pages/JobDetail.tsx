@@ -129,7 +129,7 @@ const JobDetail = () => {
         console.error('Error uploading file:', uploadError);
         
         if (uploadError.message.includes('The resource was not found')) {
-          throw new Error('Storage bucket "resumes" not found. Please contact support.');
+          throw new Error('Storage bucket "resumes" not found. Please ensure the storage bucket exists in Supabase.');
         }
         
         if (uploadError.message.includes('row-level security policy')) {

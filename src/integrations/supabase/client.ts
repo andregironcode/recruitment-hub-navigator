@@ -37,7 +37,10 @@ export const checkStorageBuckets = async () => {
       return { success: false, error };
     }
     
-    const resumesBucketExists = buckets?.some(bucket => bucket.id === 'resumes');
+    // Check for the bucket with case-insensitive comparison
+    const resumesBucketExists = buckets?.some(bucket => 
+      bucket.id.toLowerCase() === 'resumes'.toLowerCase()
+    );
     
     if (!resumesBucketExists) {
       console.warn('Resumes bucket does not exist. This should have been created via SQL migration.');
