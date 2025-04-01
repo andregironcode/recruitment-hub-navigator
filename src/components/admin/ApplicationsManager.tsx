@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FileText, Mail, Phone } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 
 // Ensure the Application interface is properly typed
 interface Application {
@@ -42,6 +42,8 @@ const ApplicationsManager = () => {
       }));
       setApplications(typedApplications);
       setFilteredApplications(typedApplications);
+      
+      console.log("Loaded applications:", typedApplications); // Debug log
     } catch (error) {
       console.error('Error loading applications:', error);
       toast({

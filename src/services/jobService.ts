@@ -81,13 +81,15 @@ export const filterJobs = async (filters: JobSearchFilters): Promise<Job[]> => {
     query = query.ilike('location', `%${filters.location}%`);
   }
 
-  if (filters.industry) {
+  if (filters.industry && filters.industry !== 'all') {
     query = query.eq('industry', filters.industry);
   }
 
-  if (filters.jobType) {
+  if (filters.jobType && filters.jobType !== 'all') {
     query = query.eq('job_type', filters.jobType);
   }
+
+  console.log('Filtering with job type:', filters.jobType); // Debug log
 
   const { data, error } = await query;
 
@@ -248,6 +250,7 @@ export const deleteCategory = async (id: number): Promise<void> => {
  * Get all job applications
  */
 export const getAllApplications = async () => {
+  console.log('Fetching applications...');
   const { data, error } = await supabase
     .from('applications')
     .select('*')
@@ -256,6 +259,14 @@ export const getAllApplications = async () => {
   if (error) {
     console.error('Error fetching applications:', error);
     throw new Error('Failed to fetch applications');
+  }
+
+  console.log('Applications data from DB:', data);
+
+  // Ensure we have data before mapping
+  if (!data || data.length === 0) {
+    console.log('No applications found in the database');
+    return [];
   }
 
   return data.map(app => ({
@@ -267,8 +278,8 @@ export const getAllApplications = async () => {
     phone: app.phone || '',
     resumeUrl: app.resume_url || '',
     coverLetter: app.cover_letter || '',
-    status: app.status,
-    dateApplied: new Date(app.date_applied).toLocaleDateString()
+    status: app.status || 'new',
+    dateApplied: app.date_applied ? new Date(app.date_applied).toLocaleDateString() : 'Unknown'
   }));
 };
 
@@ -284,5 +295,37 @@ export const updateApplicationStatus = async (id: number, status: string): Promi
   if (error) {
     console.error('Error updating application status:', error);
     throw new Error('Failed to update application status');
+  }
+};
+
+/**
+ * Submit job application
+ */
+export const submitApplication = async (application: {
+  jobId: number,
+  jobTitle: string,
+  applicantName: string,
+  email: string,
+  phone?: string,
+  resumeUrl?: string,
+  coverLetter?: string
+}): Promise<void> => {
+  const { error } = await supabase
+    .from('applications')
+    .insert({
+      job_id: application.jobId,
+      job_title: application.jobTitle,
+      applicant_name: application.applicantName,
+      email: application.email,
+      phone: application.phone || null,
+      resume_url: application.resumeUrl || null,
+      cover_letter: application.coverLetter || null,
+      status: 'new',
+      date_applied: new Date().toISOString()
+    });
+
+  if (error) {
+    console.error('Error submitting application:', error);
+    throw new Error('Failed to submit application');
   }
 };

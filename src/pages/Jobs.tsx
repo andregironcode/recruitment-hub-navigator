@@ -48,6 +48,7 @@ const Jobs = () => {
           (filters.jobType && filters.jobType !== 'all') || 
           filters.keyword || 
           filters.location) {
+        console.log('Applying initial filters:', filters); // Debug log
         handleSearch(filters);
       }
     } catch (error) {
@@ -67,6 +68,8 @@ const Jobs = () => {
     setFilters(searchFilters);
     
     try {
+      console.log('Searching with filters:', searchFilters); // Debug log
+      
       // If all filters are either empty or 'all', load all jobs
       if ((!searchFilters.industry || searchFilters.industry === 'all') && 
           (!searchFilters.jobType || searchFilters.jobType === 'all') && 
@@ -75,12 +78,8 @@ const Jobs = () => {
         const allJobs = await getAllJobs();
         setJobs(allJobs);
       } else {
-        // Clean up filters - convert 'all' to empty string for backend filtering
-        const cleanedFilters = { ...searchFilters };
-        if (cleanedFilters.industry === 'all') cleanedFilters.industry = '';
-        if (cleanedFilters.jobType === 'all') cleanedFilters.jobType = '';
-        
-        const filteredJobs = await filterJobs(cleanedFilters);
+        const filteredJobs = await filterJobs(searchFilters);
+        console.log('Filtered jobs:', filteredJobs.length); // Debug log
         setJobs(filteredJobs);
       }
     } catch (error) {

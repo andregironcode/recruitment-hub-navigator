@@ -15,9 +15,9 @@ import {
   Send,
   FileUp
 } from 'lucide-react';
-import { getJobById } from '@/services/jobService';
+import { getJobById, submitApplication } from '@/services/jobService';
 import { Job } from '@/components/jobs/JobList';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import {
   Dialog,
   DialogContent,
@@ -90,15 +90,30 @@ const JobDetail = () => {
   const handleApply = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!job) return;
+    if (!job || !id) return;
     
     setIsSubmitting(true);
     
     try {
-      // Here we would normally submit the application to the backend
-      // including the CV file upload
-      // For now, we'll just simulate a successful submission
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // In a real application, we would upload the CV file to storage
+      // and get a URL back, but for this demo, we'll simulate it
+      let resumeUrl = '';
+      if (cvFile) {
+        // Simulate file upload - in real app, upload to Supabase storage
+        resumeUrl = URL.createObjectURL(cvFile);
+        console.log('Uploaded CV file:', resumeUrl);
+      }
+      
+      // Submit the application
+      await submitApplication({
+        jobId: parseInt(id, 10),
+        jobTitle: job.title,
+        applicantName: applicationData.name,
+        email: applicationData.email,
+        phone: applicationData.phone,
+        resumeUrl,
+        coverLetter: applicationData.coverLetter
+      });
       
       toast({
         title: 'Application Submitted',
