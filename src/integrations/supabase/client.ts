@@ -44,19 +44,43 @@ export const checkStorageBuckets = async () => {
     
     console.log('Available buckets:', buckets);
     
-    // Just check if the resume bucket exists - we no longer try to create it
-    // as this is now handled by the SQL migration
-    const resumesBucket = buckets?.find(bucket => 
+    // Improve error handling - directly try accessing the bucket
+    // instead of just looking for it in the list
+    // This handles the case where the bucket exists but isn't visible in the list
+    let resumesBucket = buckets?.find(bucket => 
       bucket.id === RESUME_BUCKET_ID || 
       bucket.name === 'Resumes Storage'
     );
     
+    // If we don't find the bucket in the list, try to access it directly
     if (!resumesBucket) {
-      console.warn('Resumes bucket not found. Available buckets:', buckets?.map(b => `${b.id} (${b.name})`) || []);
-      return { 
-        success: false, 
-        error: new Error('Resume storage not found. This may be a configuration issue.')
-      };
+      console.log('Bucket not found in list, trying direct access...');
+      try {
+        // Try to access the bucket directly - this can work even if listBuckets doesn't show it
+        const { data, error } = await supabase.storage.from(RESUME_BUCKET_ID).list('', {
+          limit: 1,
+        });
+        
+        if (!error) {
+          console.log('Successfully accessed bucket directly');
+          // Create a placeholder bucket info if direct access works
+          resumesBucket = { id: RESUME_BUCKET_ID, name: 'Resumes Storage' };
+        } else {
+          console.warn('Could not access bucket directly:', error);
+          
+          // We'll still return failure since the bucket isn't accessible
+          return { 
+            success: false, 
+            error: new Error('Resume storage not accessible. Please ensure the bucket exists and permissions are set correctly.')
+          };
+        }
+      } catch (directAccessError) {
+        console.error('Error directly accessing bucket:', directAccessError);
+        return { 
+          success: false, 
+          error: new Error('Failed to access resume storage. This may be a configuration issue.')
+        };
+      }
     }
     
     console.log('Resumes bucket exists and is accessible:', resumesBucket);
