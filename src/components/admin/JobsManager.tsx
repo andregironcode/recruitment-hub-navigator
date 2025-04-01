@@ -31,7 +31,7 @@ import { Job } from "@/components/jobs/JobList";
 
 const JobsManager = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [categories, setCategories] = useState<{id: number; name: string}[]>([]);
+  const [industries, setIndustries] = useState<{id: number; name: string}[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentJob, setCurrentJob] = useState<Job | null>(null);
@@ -47,8 +47,7 @@ const JobsManager = () => {
     jobType: "full-time",
     industry: "",
     description: "",
-    featured: false,
-    category: ""
+    featured: false
   });
   
   const loadJobs = async () => {
@@ -68,15 +67,15 @@ const JobsManager = () => {
     }
   };
   
-  const loadCategories = async () => {
+  const loadIndustries = async () => {
     try {
-      const categoryData = await getAllCategories();
-      setCategories(categoryData.map(cat => ({ id: cat.id, name: cat.name })));
+      const industryData = await getAllCategories();
+      setIndustries(industryData.map(ind => ({ id: ind.id, name: ind.name })));
     } catch (error) {
-      console.error("Error loading categories:", error);
+      console.error("Error loading industries:", error);
       toast({
         title: "Error",
-        description: "Failed to load job categories",
+        description: "Failed to load industries",
         variant: "destructive"
       });
     }
@@ -84,7 +83,7 @@ const JobsManager = () => {
   
   useEffect(() => {
     loadJobs();
-    loadCategories();
+    loadIndustries();
   }, []);
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -109,8 +108,7 @@ const JobsManager = () => {
       jobType: "full-time",
       industry: "",
       description: "",
-      featured: false,
-      category: ""
+      featured: false
     });
     setCurrentJob(null);
   };
@@ -125,8 +123,7 @@ const JobsManager = () => {
       jobType: job.jobType,
       industry: job.industry,
       description: job.description,
-      featured: job.featured || false,
-      category: job.category || ""
+      featured: job.featured || false
     });
     setIsDialogOpen(true);
   };
@@ -201,7 +198,6 @@ const JobsManager = () => {
     ? jobs.filter(job => 
         job.title.toLowerCase().includes(filter.toLowerCase()) ||
         job.company.toLowerCase().includes(filter.toLowerCase()) ||
-        job.category?.toLowerCase().includes(filter.toLowerCase()) ||
         job.industry.toLowerCase().includes(filter.toLowerCase())
       )
     : jobs;
@@ -242,7 +238,7 @@ const JobsManager = () => {
                 <TableHead>Company</TableHead>
                 <TableHead>Location</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead>Industry/Category</TableHead>
+                <TableHead>Industry</TableHead>
                 <TableHead>Posted</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
@@ -257,12 +253,7 @@ const JobsManager = () => {
                   <TableCell>{job.company}</TableCell>
                   <TableCell>{job.location}</TableCell>
                   <TableCell>{job.jobType}</TableCell>
-                  <TableCell>
-                    <div>{job.industry}</div>
-                    {job.category && job.category !== job.industry && (
-                      <div className="text-sm text-muted-foreground">{job.category}</div>
-                    )}
-                  </TableCell>
+                  <TableCell>{job.industry}</TableCell>
                   <TableCell>{job.postedDate}</TableCell>
                   <TableCell>
                     <div className="flex gap-2">
@@ -374,44 +365,28 @@ const JobsManager = () => {
                 <Label htmlFor="industry">Industry *</Label>
                 <Select
                   value={formData.industry} 
-                  onValueChange={(value) => {
-                    handleSelectChange("industry", value);
-                    // Auto-set the category to match industry if empty
-                    if (!formData.category) {
-                      handleSelectChange("category", value);
-                    }
-                  }}
+                  onValueChange={(value) => handleSelectChange("industry", value)}
                 >
                   <SelectTrigger id="industry">
                     <SelectValue placeholder="Select an industry" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="technology">Technology</SelectItem>
-                    <SelectItem value="finance">Finance & Accounting</SelectItem>
-                    <SelectItem value="engineering">Engineering</SelectItem>
-                    <SelectItem value="sales">Sales & Marketing</SelectItem>
-                    <SelectItem value="executive">Executive Search</SelectItem>
-                    <SelectItem value="manufacturing">Manufacturing</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="category">Category</Label>
-                <Select 
-                  value={formData.category} 
-                  onValueChange={(value) => handleSelectChange("category", value)}
-                >
-                  <SelectTrigger id="category">
-                    <SelectValue placeholder="Select a category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">None</SelectItem>
-                    {categories.map((category) => (
-                      <SelectItem key={category.id} value={category.name}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
+                    {industries.length > 0 ? (
+                      industries.map((industry) => (
+                        <SelectItem key={industry.id} value={industry.name}>
+                          {industry.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <>
+                        <SelectItem value="technology">Technology</SelectItem>
+                        <SelectItem value="finance">Finance & Accounting</SelectItem>
+                        <SelectItem value="engineering">Engineering</SelectItem>
+                        <SelectItem value="sales">Sales & Marketing</SelectItem>
+                        <SelectItem value="executive">Executive Search</SelectItem>
+                        <SelectItem value="manufacturing">Manufacturing</SelectItem>
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
               </div>

@@ -21,7 +21,6 @@ export interface JobSearchFilters {
   location: string;
   industry: string;
   jobType: string;
-  category?: string;
 }
 
 const JobSearch: React.FC<JobSearchProps> = ({ onSearch }) => {
@@ -31,15 +30,15 @@ const JobSearch: React.FC<JobSearchProps> = ({ onSearch }) => {
     industry: '',
     jobType: ''
   });
-  const [categories, setCategories] = useState<{id: number, name: string}[]>([]);
+  const [industries, setIndustries] = useState<{id: number, name: string}[]>([]);
   
   useEffect(() => {
     const loadCategories = async () => {
       try {
         const data = await getAllCategories();
-        setCategories(data);
+        setIndustries(data);
       } catch (error) {
-        console.error('Error loading categories:', error);
+        console.error('Error loading industries:', error);
       }
     };
     
@@ -58,7 +57,7 @@ const JobSearch: React.FC<JobSearchProps> = ({ onSearch }) => {
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
       <form onSubmit={handleSubmit}>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
             <label htmlFor="keyword" className="block text-sm font-medium text-gray-700 mb-1">
               Keywords
@@ -98,12 +97,11 @@ const JobSearch: React.FC<JobSearchProps> = ({ onSearch }) => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Industries</SelectItem>
-                <SelectItem value="Technology">Technology</SelectItem>
-                <SelectItem value="Finance">Finance</SelectItem>
-                <SelectItem value="Healthcare">Healthcare</SelectItem>
-                <SelectItem value="Marketing">Marketing</SelectItem>
-                <SelectItem value="Engineering">Engineering</SelectItem>
-                <SelectItem value="Retail">Retail</SelectItem>
+                {industries.map(industry => (
+                  <SelectItem key={industry.id} value={industry.name}>
+                    {industry.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -126,28 +124,6 @@ const JobSearch: React.FC<JobSearchProps> = ({ onSearch }) => {
                 <SelectItem value="Contract">Contract</SelectItem>
                 <SelectItem value="Temporary">Temporary</SelectItem>
                 <SelectItem value="Remote">Remote</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div>
-            <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
-              Category
-            </label>
-            <Select 
-              value={filters.category}
-              onValueChange={(value) => handleChange('category', value)}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="All Categories" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {categories.map(category => (
-                  <SelectItem key={category.id} value={category.name}>
-                    {category.name}
-                  </SelectItem>
-                ))}
               </SelectContent>
             </Select>
           </div>

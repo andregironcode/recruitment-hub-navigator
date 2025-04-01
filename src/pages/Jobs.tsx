@@ -42,8 +42,7 @@ const Jobs = () => {
       if ((filters.industry && filters.industry !== 'all') || 
           (filters.jobType && filters.jobType !== 'all') || 
           filters.keyword || 
-          filters.location || 
-          (filters.category && filters.category !== 'all')) {
+          filters.location) {
         handleSearch(filters);
       }
     } catch (error) {
@@ -67,8 +66,7 @@ const Jobs = () => {
       if ((!searchFilters.industry || searchFilters.industry === 'all') && 
           (!searchFilters.jobType || searchFilters.jobType === 'all') && 
           !searchFilters.keyword && 
-          !searchFilters.location &&
-          (!searchFilters.category || searchFilters.category === 'all')) {
+          !searchFilters.location) {
         const allJobs = await getAllJobs();
         setJobs(allJobs);
       } else {
@@ -76,7 +74,6 @@ const Jobs = () => {
         const cleanedFilters = { ...searchFilters };
         if (cleanedFilters.industry === 'all') cleanedFilters.industry = '';
         if (cleanedFilters.jobType === 'all') cleanedFilters.jobType = '';
-        if (cleanedFilters.category === 'all') cleanedFilters.category = '';
         
         const filteredJobs = await filterJobs(cleanedFilters);
         setJobs(filteredJobs);

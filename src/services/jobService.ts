@@ -27,8 +27,7 @@ export const getAllJobs = async (): Promise<Job[]> => {
     industry: job.industry,
     description: job.description,
     postedDate: job.posted_date ? new Date(job.posted_date).toLocaleDateString() : 'Today',
-    featured: job.featured || false,
-    category: job.category || undefined
+    featured: job.featured || false
   }));
 };
 
@@ -60,8 +59,7 @@ export const getJobById = async (id: number): Promise<Job | null> => {
     industry: data.industry,
     description: data.description,
     postedDate: data.posted_date ? new Date(data.posted_date).toLocaleDateString() : 'Today',
-    featured: data.featured || false,
-    category: data.category || undefined
+    featured: data.featured || false
   };
 };
 
@@ -91,10 +89,6 @@ export const filterJobs = async (filters: JobSearchFilters): Promise<Job[]> => {
     query = query.eq('job_type', filters.jobType);
   }
 
-  if (filters.category) {
-    query = query.eq('category', filters.category);
-  }
-
   const { data, error } = await query;
 
   if (error) {
@@ -113,8 +107,7 @@ export const filterJobs = async (filters: JobSearchFilters): Promise<Job[]> => {
     industry: job.industry,
     description: job.description,
     postedDate: job.posted_date ? new Date(job.posted_date).toLocaleDateString() : 'Today',
-    featured: job.featured || false,
-    category: job.category || undefined
+    featured: job.featured || false
   }));
 };
 
@@ -131,8 +124,7 @@ export const addJob = async (job: Omit<Job, 'id'>): Promise<void> => {
     job_type: job.jobType, // Map jobType to job_type
     industry: job.industry,
     description: job.description,
-    featured: job.featured,
-    category: job.category
+    featured: job.featured
   };
 
   const { error } = await supabase
@@ -158,8 +150,7 @@ export const updateJob = async (job: Job): Promise<void> => {
     job_type: job.jobType, // Map jobType to job_type
     industry: job.industry,
     description: job.description,
-    featured: job.featured,
-    category: job.category
+    featured: job.featured
   };
 
   const { error } = await supabase
@@ -189,7 +180,7 @@ export const deleteJob = async (id: number): Promise<void> => {
 };
 
 /**
- * Get all job categories
+ * Get all job categories (industries)
  */
 export const getAllCategories = async (): Promise<{ id: number; name: string; description: string; jobCount: number }[]> => {
   const { data, error } = await supabase
@@ -201,15 +192,15 @@ export const getAllCategories = async (): Promise<{ id: number; name: string; de
     throw new Error('Failed to fetch categories');
   }
   
-  // Count jobs per category
+  // Count jobs per industry
   const categoriesWithCount = await Promise.all(data.map(async (category) => {
     const { count, error: countError } = await supabase
       .from('jobs')
       .select('*', { count: 'exact', head: true })
-      .eq('category', category.name);
+      .eq('industry', category.name);
       
     if (countError) {
-      console.error('Error counting jobs for category:', countError);
+      console.error('Error counting jobs for industry:', countError);
       return { ...category, jobCount: 0 };
     }
     
@@ -225,7 +216,7 @@ export const getAllCategories = async (): Promise<{ id: number; name: string; de
 };
 
 /**
- * Add a new category
+ * Add a new industry category
  */
 export const addCategory = async (category: Omit<{ name: string; description: string }, 'id' | 'jobCount'>): Promise<void> => {
   const { error } = await supabase
@@ -233,13 +224,13 @@ export const addCategory = async (category: Omit<{ name: string; description: st
     .insert(category);
 
   if (error) {
-    console.error('Error adding category:', error);
-    throw new Error('Failed to add category');
+    console.error('Error adding industry:', error);
+    throw new Error('Failed to add industry');
   }
 };
 
 /**
- * Delete a category
+ * Delete an industry category
  */
 export const deleteCategory = async (id: number): Promise<void> => {
   const { error } = await supabase
@@ -248,8 +239,8 @@ export const deleteCategory = async (id: number): Promise<void> => {
     .eq('id', id);
 
   if (error) {
-    console.error('Error deleting category:', error);
-    throw new Error('Failed to delete category');
+    console.error('Error deleting industry:', error);
+    throw new Error('Failed to delete industry');
   }
 };
 
