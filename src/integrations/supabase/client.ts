@@ -29,13 +29,19 @@ export const supabase = createClient<Database>(
 // Initialize storage buckets if they don't exist
 export const initializeStorageBuckets = async () => {
   try {
-    // Check if resumes bucket exists
-    const { data: buckets } = await supabase.storage.listBuckets();
+    // Explicitly create resumes bucket via API call
+    const { data: buckets, error } = await supabase.storage.listBuckets();
+    
+    if (error) {
+      console.error('Error listing buckets:', error);
+      return { success: false, error };
+    }
+    
     const resumesBucketExists = buckets?.some(bucket => bucket.id === 'resumes');
     
     if (!resumesBucketExists) {
       console.log('Creating resumes bucket...');
-      await supabase.storage.createBucket('resumes', {
+      const { error: createError } = await supabase.storage.createBucket('resumes', {
         public: true, // Make the bucket public so we can access files directly
         fileSizeLimit: 10485760, // 10MB limit
         allowedMimeTypes: [
@@ -44,12 +50,18 @@ export const initializeStorageBuckets = async () => {
           'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         ]
       });
+      
+      if (createError) {
+        console.error('Error creating resumes bucket:', createError);
+        return { success: false, error: createError };
+      }
+      
       console.log('Resumes bucket created successfully');
+      return { success: true };
     } else {
       console.log('Resumes bucket already exists');
+      return { success: true };
     }
-    
-    return { success: true };
   } catch (error) {
     console.error('Failed to initialize storage buckets:', error);
     return { success: false, error };

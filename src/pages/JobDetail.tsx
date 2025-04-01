@@ -47,14 +47,19 @@ const JobDetail = () => {
   const [cvFile, setCvFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fileUploading, setFileUploading] = useState(false);
+  const [bucketInitialized, setBucketInitialized] = useState(false);
 
   useEffect(() => {
     // Initialize storage buckets when component loads
-    initializeStorageBuckets().then(result => {
+    const initBucket = async () => {
+      const result = await initializeStorageBuckets();
+      setBucketInitialized(result.success);
       if (!result.success) {
-        console.warn('Storage initialization failed. File uploads may not work correctly.');
+        console.warn('Storage initialization failed. File uploads may not work correctly.', result.error);
       }
-    });
+    };
+    
+    initBucket();
 
     const fetchJob = async () => {
       if (!id) return;
@@ -102,13 +107,20 @@ const JobDetail = () => {
     try {
       console.log('Starting file upload for', file.name);
       
+      // Ensure bucket is initialized before upload
+      if (!bucketInitialized) {
+        console.log('Initializing bucket before upload...');
+        const initResult = await initializeStorageBuckets();
+        if (!initResult.success) {
+          throw new Error(`Failed to initialize storage bucket: ${initResult.error?.message || 'Unknown error'}`);
+        }
+        setBucketInitialized(true);
+      }
+      
       // Create a unique file path with timestamp and random string
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
       const filePath = `${fileName}`;
-
-      // Make sure the bucket exists first
-      await initializeStorageBuckets();
       
       console.log('Uploading file to resumes bucket...');
       const { error: uploadError, data: uploadData } = await supabase.storage
