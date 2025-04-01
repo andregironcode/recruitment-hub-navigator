@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -29,7 +30,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, initializeStorageBuckets } from '@/integrations/supabase/client';
 
 const JobDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -48,6 +49,13 @@ const JobDetail = () => {
   const [fileUploading, setFileUploading] = useState(false);
 
   useEffect(() => {
+    // Initialize storage buckets when component loads
+    initializeStorageBuckets().then(result => {
+      if (!result.success) {
+        console.warn('Storage initialization failed. File uploads may not work correctly.');
+      }
+    });
+
     const fetchJob = async () => {
       if (!id) return;
       
@@ -97,40 +105,41 @@ const JobDetail = () => {
       // Create a unique file path with timestamp and random string
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-      const filePath = `resumes/${fileName}`;
+      const filePath = `${fileName}`;
 
-      // Check if storage bucket exists first
-      const { data: buckets } = await supabase.storage.listBuckets();
-      console.log('Available buckets:', buckets);
+      // Make sure the bucket exists first
+      await initializeStorageBuckets();
       
-      // Directly attempt to upload the file without creating a bucket
-      console.log('Uploading file to', filePath);
+      console.log('Uploading file to resumes bucket...');
       const { error: uploadError, data: uploadData } = await supabase.storage
         .from('resumes')
-        .upload(filePath, file);
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
 
       if (uploadError) {
         console.error('Error uploading file:', uploadError);
         
         if (uploadError.message.includes('The resource was not found')) {
-          throw new Error('Storage bucket "resumes" not found. Please contact an administrator.');
+          throw new Error('Storage bucket "resumes" not found. Please ensure the bucket exists.');
         }
         
         if (uploadError.message.includes('row-level security policy')) {
-          throw new Error('Permission denied: Cannot upload file due to security restrictions. Please contact an administrator.');
+          throw new Error('Permission denied: Cannot upload file due to security restrictions.');
         }
         
-        throw new Error('Failed to upload resume: ' + uploadError.message);
+        throw new Error(`Failed to upload resume: ${uploadError.message}`);
       }
 
-      if (!uploadData) {
+      if (!uploadData || !uploadData.path) {
         throw new Error('Upload failed - no data returned from server');
       }
 
       // Get a public URL for the file
       const { data: publicUrlData } = supabase.storage
         .from('resumes')
-        .getPublicUrl(filePath);
+        .getPublicUrl(uploadData.path);
 
       if (!publicUrlData || !publicUrlData.publicUrl) {
         throw new Error('Failed to get resume URL');
