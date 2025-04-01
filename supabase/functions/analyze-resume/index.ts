@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -62,9 +61,8 @@ serve(async (req) => {
                   // For PDF, we need to extract text using OpenAI
                   console.log("Processing PDF file, sending to OpenAI for text extraction");
                   
-                  // FIXED: Properly format OpenAI API request for PDF text extraction
+                  // FIXED: Use the proper OpenAI API for PDF text extraction
                   try {
-                    // First, we'll directly send the PDF to OpenAI's chat completions API with vision capabilities
                     const pdfBytes = await response.arrayBuffer();
                     const pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(pdfBytes)));
                     

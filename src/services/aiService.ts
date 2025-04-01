@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 interface ResumeAnalysisParams {
@@ -49,6 +50,24 @@ export async function analyzeResume({
         }
         // Otherwise continue to generate a new one
       }
+    }
+    
+    // Only make the function call if we have both a resumeUrl/resumeContent and a jobDescription
+    if ((!resumeUrl && !resumeContent) || !jobDescription) {
+      console.error('Missing required parameters for resume analysis:', {
+        hasResumeUrl: !!resumeUrl,
+        hasResumeContent: !!resumeContent,
+        hasJobDescription: !!jobDescription
+      });
+      return {
+        educationLevel: 'Not available',
+        yearsExperience: 'Not available',
+        skillsMatch: 'Low',
+        keySkills: ['Unable to analyze resume - missing required parameters'],
+        missingRequirements: ['Unable to analyze resume - missing required parameters'],
+        overallScore: 0,
+        fallback: true
+      };
     }
     
     const response = await fetch(
