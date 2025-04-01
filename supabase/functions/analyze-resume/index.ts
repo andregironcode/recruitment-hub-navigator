@@ -56,7 +56,6 @@ serve(async (req) => {
     
     let resumeText = '';
     let isPdfFile = false;
-    let pdfBuffer: ArrayBuffer | null = null;
     
     // Extract text from resume if URL is provided
     if (resumeUrl) {
@@ -79,11 +78,11 @@ serve(async (req) => {
           
           if (contentType?.includes('application/pdf')) {
             isPdfFile = true;
-            // For PDFs, store the buffer for later text extraction
-            pdfBuffer = await response.arrayBuffer();
+            // For PDFs, store the buffer for text extraction
+            const pdfBuffer = await response.arrayBuffer();
             console.log(`Downloaded PDF, size: ${pdfBuffer.byteLength} bytes`);
             
-            // Extract text directly from PDF instead of using Vision API
+            // Extract text directly from PDF
             try {
               const textDecoder = new TextDecoder();
               resumeText = textDecoder.decode(pdfBuffer);
