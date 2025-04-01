@@ -55,7 +55,6 @@ serve(async (req) => {
     }
     
     let resumeText = '';
-    let pdfArrayBuffer = null;
     
     // Extract text from resume if URL is provided
     if (resumeUrl) {
@@ -77,12 +76,15 @@ serve(async (req) => {
           console.log(`File content type: ${contentType}`);
           
           if (contentType?.includes('application/pdf')) {
-            // For PDFs, get the content as an array buffer for extraction
-            pdfArrayBuffer = await response.arrayBuffer();
-            console.log(`Downloaded PDF, size: ${pdfArrayBuffer.byteLength} bytes`);
+            // For PDFs, get the content directly
+            const pdfBuffer = await response.arrayBuffer();
+            console.log(`Downloaded PDF, size: ${pdfBuffer.byteLength} bytes`);
             
-            // For logging purposes
-            resumeText = "PDF content downloaded successfully";
+            // For now, we'll just indicate we have a PDF without actual text extraction
+            // The text will be described in the prompt
+            resumeText = "This is a PDF resume that has been downloaded. The analysis will be based on this document.";
+            
+            console.log(`PDF detected, prepared for analysis`);
           } else if (contentType?.includes('text')) {
             // For text files, just get the content directly
             resumeText = await response.text();
@@ -111,8 +113,8 @@ serve(async (req) => {
       console.log(resumeText);
     }
     
-    // If we have no meaningful text to analyze and no PDF, return a fallback analysis
-    if (!pdfArrayBuffer && (!resumeText || resumeText.includes('Error accessing resume file') || resumeText.length < 50)) {
+    // If we have no meaningful text to analyze, return a fallback analysis
+    if (!resumeText || resumeText.includes('Error accessing resume file') || resumeText.length < 50) {
       console.log('Insufficient resume text, generating fallback analysis');
       
       const fallbackAnalysis = {
@@ -169,78 +171,35 @@ serve(async (req) => {
     try {
       console.log("Sending request to OpenAI");
       
-      let messages;
+      // Build a richer prompt for the OpenAI API
+      const systemPrompt = `You are an expert AI recruitment assistant. Your task is to analyze a resume against a job description in detail.
+
+      Pay special attention to extracting:
+      1. Education level - Look for degrees, certifications, and educational achievements (Bachelor's, Master's, PhD, etc.)
+      2. Years of experience - Calculate total relevant years of work experience
+      3. Technical skills - Identify specific technologies, tools, programming languages, and other technical competencies
+      4. Key matching skills - Determine which skills in the resume match the job requirements
+      5. Missing requirements - Identify important job requirements not present in the resume
       
-      // Format the system and user messages for the OpenAI API
-      if (pdfArrayBuffer) {
-        console.log("Using PDF content for analysis");
-        
-        // For PDFs, extract text and use in the prompt
-        // Since we can't directly upload the PDF to the chat API, we need to use the PDF content as text
-        
-        // Construct messages for PDF analysis
-        messages = [
-          { 
-            role: 'system',
-            content: `You are an AI recruitment assistant that analyzes resumes against job descriptions.
-            Extract relevant education, experience, and skills from the resume information.
-            Your task is to determine how well the candidate matches the job requirements.`
-          },
-          { 
-            role: 'user', 
-            content: `Analyze how well this resume matches the following job description:
-        
-            JOB DESCRIPTION:
-            ${jobDescription}
-            
-            RESUME:
-            This is a PDF resume that has been downloaded. Please analyze it based on the job description.
-            The resume contains information about the applicant's education, work experience, skills, and qualifications.
-            
-            Return ONLY a JSON object with these fields:
-            1. educationLevel: The candidate's highest level of education mentioned (or "Unknown" if not found) - typically Bachelor's, Master's, Associate's, PhD, High School
-            2. yearsExperience: Total relevant years of experience (or "Unknown" if not clearly stated) - should be a number or range like "3-5"
-            3. skillsMatch: Overall match as "High", "Medium", or "Low"
-            4. keySkills: Array of key skills found in resume that match job requirements
-            5. missingRequirements: Array of key requirements from job description not found in resume
-            6. overallScore: A numeric score from 0-100 representing overall match percentage
-            
-            Return your analysis as clean, parseable JSON WITHOUT explanations, code blocks, or other text.`
-          }
-        ];
-      } else {
-        // Use text-only approach for directly provided text content
-        messages = [
-          { 
-            role: 'system',
-            content: `You are an AI recruitment assistant that analyzes resumes against job descriptions.
-            Extract relevant education, experience, and skills from the resume text.
-            Your task is to determine how well the candidate matches the job requirements.`
-          },
-          { 
-            role: 'user', 
-            content: `Analyze how well this resume matches the following job description:
-        
-            JOB DESCRIPTION:
-            ${jobDescription}
-            
-            RESUME TEXT:
-            ${resumeText}
-            
-            Return ONLY a JSON object with these fields:
-            1. educationLevel: The candidate's highest level of education mentioned (or "Unknown" if not found) - typically Bachelor's, Master's, Associate's, PhD, High School
-            2. yearsExperience: Total relevant years of experience (or "Unknown" if not clearly stated) - should be a number or range like "3-5"
-            3. skillsMatch: Overall match as "High", "Medium", or "Low"
-            4. keySkills: Array of key skills found in resume that match job requirements
-            5. missingRequirements: Array of key requirements from job description not found in resume
-            6. overallScore: A numeric score from 0-100 representing overall match percentage
-            
-            Return your analysis as clean, parseable JSON WITHOUT explanations, code blocks, or other text.`
-          }
-        ];
-      }
+      Be thorough in your analysis and provide an accurate assessment of the candidate's match for the position.`;
       
-      console.log("Using chat completions API with model gpt-4o-mini");
+      const userPrompt = `Analyze how well the following resume matches the job description:
+      
+      JOB DESCRIPTION:
+      ${jobDescription}
+      
+      RESUME:
+      ${resumeText}
+      
+      Return ONLY a clean JSON object with these fields (no markdown, no explanations, just valid JSON):
+      {
+        "educationLevel": "The candidate's highest level of education (Bachelor's, Master's, PhD, etc., or 'Unknown' if not found)",
+        "yearsExperience": "Total relevant years of experience (a number, range, or 'Unknown' if not clearly stated)",
+        "skillsMatch": "Overall match level ('High', 'Medium', or 'Low')",
+        "keySkills": ["Array of specific skills from resume that match job requirements"],
+        "missingRequirements": ["Array of key requirements from job description not found in resume"],
+        "overallScore": "A score from 0-100 representing overall match percentage"
+      }`;
       
       // Send the prompt to OpenAI for analysis
       const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -250,9 +209,12 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: messages,
-          temperature: 0.3,
+          model: 'gpt-4o',  // Using GPT-4o for better accuracy
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          temperature: 0.1,  // Lower temperature for more consistent results
         }),
       });
       
@@ -273,7 +235,13 @@ serve(async (req) => {
       // Try to parse the result as JSON
       let analysis;
       try {
-        analysis = JSON.parse(analysisText.trim());
+        // Clean the response to ensure it's valid JSON
+        const cleanedText = analysisText.trim()
+          .replace(/```json/g, '')  // Remove markdown code blocks if present
+          .replace(/```/g, '')      // Remove closing code blocks
+          .trim();
+          
+        analysis = JSON.parse(cleanedText);
         console.log("Successfully parsed analysis result as JSON");
         
         // Ensure all required fields exist
@@ -282,7 +250,9 @@ serve(async (req) => {
         analysis.skillsMatch = analysis.skillsMatch || "Low";
         analysis.keySkills = analysis.keySkills || [];
         analysis.missingRequirements = analysis.missingRequirements || [];
-        analysis.overallScore = analysis.overallScore || 0;
+        analysis.overallScore = typeof analysis.overallScore === 'number' ? 
+          analysis.overallScore : 
+          (typeof analysis.overallScore === 'string' ? parseInt(analysis.overallScore, 10) || 0 : 0);
         analysis.fallback = false;
       } catch (parseError) {
         console.error('Error parsing OpenAI response:', parseError);

@@ -115,6 +115,11 @@ export async function analyzeResume({
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Error analyzing resume:', errorText);
+      toast({
+        title: 'Analysis Error',
+        description: 'There was an error analyzing the resume. Please try again.',
+        variant: 'destructive'
+      });
       return {
         educationLevel: 'Error',
         yearsExperience: 'Error',
@@ -142,6 +147,11 @@ export async function analyzeResume({
     };
   } catch (error) {
     console.error('Error in analyzeResume function:', error);
+    toast({
+      title: 'Analysis Failed',
+      description: 'Failed to analyze the resume. Please try again later.',
+      variant: 'destructive'
+    });
     // Return a default analysis when the API fails
     return {
       educationLevel: 'Not available',
