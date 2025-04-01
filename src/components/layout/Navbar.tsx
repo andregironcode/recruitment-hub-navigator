@@ -18,7 +18,7 @@ const Navbar = () => {
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
               <Link to="/" className="text-2xl font-bold text-recruitment-primary">
-                Harries Recruitment
+                Harries Group
               </Link>
             </div>
           </div>
@@ -39,7 +39,7 @@ const Navbar = () => {
             </Link>
             <Link to="/admin">
               <Button variant="outline" className="ml-4 border-recruitment-primary text-recruitment-primary hover:bg-recruitment-primary hover:text-white">
-                Admin Login
+                Client Portal
               </Button>
             </Link>
           </div>
@@ -97,7 +97,7 @@ const Navbar = () => {
               className="text-recruitment-dark hover:text-recruitment-primary px-3 py-2"
               onClick={() => setIsMenuOpen(false)}
             >
-              Admin Login
+              Client Portal
             </Link>
           </div>
         </div>

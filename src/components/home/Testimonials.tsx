@@ -5,21 +5,21 @@ import { Card, CardContent } from '@/components/ui/card';
 const testimonialsData = [
   {
     id: 1,
-    quote: "Harries Recruitment understood our company culture and helped us find candidates who were not just qualified but were also a perfect fit for our team.",
+    quote: "The Harries team took the time to understand our unique company culture and team dynamics, helping us find candidates who were not just qualified but were perfect fits for our organisation.",
     author: "Sarah Johnson",
-    position: "HR Director, TechFusion Inc."
+    position: "HR Director, Manufacturing Industry"
   },
   {
     id: 2,
-    quote: "I was struggling to find a role that matched my skills and career aspirations. Harries Recruitment not only found me the perfect position but also provided valuable guidance throughout the process.",
+    quote: "Working with Harries Recruitment has transformed our hiring process. Their industry knowledge and commitment to finding the right match has saved us time and improved our retention rates.",
     author: "James Wilson",
-    position: "Software Engineer, CloudScale"
+    position: "Operations Manager, Technology Sector"
   },
   {
     id: 3,
-    quote: "The team at Harries Recruitment is professional, thorough, and truly committed to finding the right match for both employers and candidates.",
+    quote: "We've been partnering with Harries for over a decade. Their team consistently delivers exceptional candidates and valuable market insights that have helped us stay competitive in talent acquisition.",
     author: "Emily Turner",
-    position: "Operations Manager, Global Finance"
+    position: "CEO, Financial Services"
   }
 ];
 

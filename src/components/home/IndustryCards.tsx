@@ -8,38 +8,38 @@ const industriesData = [
   { 
     id: 'technology', 
     name: 'Technology', 
-    description: 'From software development to IT support roles across various tech sectors.',
+    description: 'Software development, IT support, cybersecurity, and technical leadership roles.',
     jobCount: 42
   },
   { 
     id: 'finance', 
-    name: 'Finance', 
-    description: 'Banking, accounting, financial analysis, and advisory positions.',
+    name: 'Finance & Accounting', 
+    description: 'Banking, accounting, financial analysis, and senior finance leadership positions.',
     jobCount: 36
-  },
-  { 
-    id: 'healthcare', 
-    name: 'Healthcare', 
-    description: 'Medical professionals, administrators, and support staff for healthcare providers.',
-    jobCount: 29
-  },
-  { 
-    id: 'marketing', 
-    name: 'Marketing', 
-    description: 'Digital marketing, brand management, and creative positions.',
-    jobCount: 24
   },
   { 
     id: 'engineering', 
     name: 'Engineering', 
-    description: 'Civil, mechanical, electrical engineering and related technical roles.',
+    description: 'Civil, mechanical, electrical engineering and technical design positions.',
     jobCount: 31
   },
   { 
-    id: 'retail', 
-    name: 'Retail', 
-    description: 'Store management, buying, merchandising, and customer service positions.',
-    jobCount: 18
+    id: 'sales', 
+    name: 'Sales & Marketing', 
+    description: 'Sales executives, digital marketing specialists, and brand management roles.',
+    jobCount: 28
+  },
+  { 
+    id: 'executive', 
+    name: 'Executive Search', 
+    description: 'C-suite, senior leadership, and board-level appointments across industries.',
+    jobCount: 22
+  },
+  { 
+    id: 'manufacturing', 
+    name: 'Manufacturing', 
+    description: 'Production management, quality control, and operations leadership positions.',
+    jobCount: 24
   }
 ];
 
@@ -48,7 +48,7 @@ const IndustryCards = () => {
     <section className="py-16 bg-recruitment-light">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <h2 className="text-3xl font-bold text-center mb-12 text-recruitment-dark">
-          Browse Jobs by Industry
+          Our Specialist Sectors
         </h2>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
