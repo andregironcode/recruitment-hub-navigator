@@ -2,6 +2,7 @@
 import React from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import TextAlign from "@tiptap/extension-text-align"; // Import the text align extension
 import { Button } from "@/components/ui/button";
 import { 
   Bold, 
@@ -22,7 +23,15 @@ interface RichTextEditorProps {
 
 const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange }) => {
   const editor = useEditor({
-    extensions: [StarterKit],
+    extensions: [
+      StarterKit,
+      // Add the TextAlign extension with configuration
+      TextAlign.configure({
+        types: ['heading', 'paragraph'],
+        alignments: ['left', 'center', 'right'],
+        defaultAlignment: 'left',
+      }),
+    ],
     content: value,
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
@@ -94,7 +103,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange }) => {
           type="button"
           variant="ghost"
           size="sm"
-          onClick={() => editor.chain().focus().setTextAlign("left").run()}
+          onClick={() => editor.chain().focus().setTextAlign('left').run()}
           className={editor.isActive({ textAlign: "left" }) ? "bg-muted" : ""}
         >
           <AlignLeft className="h-4 w-4" />
@@ -103,7 +112,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange }) => {
           type="button"
           variant="ghost"
           size="sm"
-          onClick={() => editor.chain().focus().setTextAlign("center").run()}
+          onClick={() => editor.chain().focus().setTextAlign('center').run()}
           className={editor.isActive({ textAlign: "center" }) ? "bg-muted" : ""}
         >
           <AlignCenter className="h-4 w-4" />
@@ -112,7 +121,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange }) => {
           type="button"
           variant="ghost"
           size="sm"
-          onClick={() => editor.chain().focus().setTextAlign("right").run()}
+          onClick={() => editor.chain().focus().setTextAlign('right').run()}
           className={editor.isActive({ textAlign: "right" }) ? "bg-muted" : ""}
         >
           <AlignRight className="h-4 w-4" />
