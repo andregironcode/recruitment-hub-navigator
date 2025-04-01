@@ -188,7 +188,7 @@ serve(async (req) => {
       let openaiResponse;
       
       if (isPdfFile && pdfBuffer) {
-        console.log("PDF detected, prepared for analysis");
+        console.log("PDF detected, preparing for analysis with GPT-4 Vision");
         
         // Convert ArrayBuffer to base64 for sending in the request body
         const uint8Array = new Uint8Array(pdfBuffer);
@@ -325,7 +325,7 @@ serve(async (req) => {
           "overallScore": "A score from 0-100 representing overall match percentage"
         }`;
         
-        console.log("Sending request to OpenAI");
+        console.log("Sending request to OpenAI for text analysis");
         
         // Send the prompt to OpenAI for analysis
         openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
