@@ -1,15 +1,12 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ResumeAnalysis {
-  educationLevel: string;
-  yearsExperience: string;
+  overallScore: number;
   skillsMatch: string;
   keySkills: string[];
   missingRequirements: string[];
-  overallScore: number;
-  _note?: string;
-  _error?: string;
+  educationLevel: string;
+  yearsExperience: string;
   fallback?: boolean;
 }
 

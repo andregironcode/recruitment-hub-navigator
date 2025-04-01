@@ -1,17 +1,27 @@
-
 import React, { useState, useEffect } from "react";
-import { getApplicationsByJobId, updateApplicationStatus, getJobById } from "@/services/jobService";
+import { getApplicationsByJobId, updateApplicationStatus, getJobById, deleteApplication } from "@/services/jobService";
 import { getJobApplicationsAnalyses, analyzeResume, ResumeAnalysis } from "@/services/aiService";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Mail, Phone, ArrowLeft, Brain, Filter, Users, AlertTriangle, InfoIcon } from "lucide-react";
+import { FileText, Mail, Phone, ArrowLeft, Brain, Filter, Users, AlertTriangle, InfoIcon, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface JobApplicantsProps {
   jobId: number;
@@ -218,6 +228,24 @@ const JobApplicants = ({ jobId, jobTitle, onBack }: JobApplicantsProps) => {
       });
     } finally {
       setAiLoading(false);
+    }
+  };
+
+  const handleDeleteApplication = async (applicationId: number, applicantName: string) => {
+    try {
+      await deleteApplication(applicationId);
+      setApplicants(current => current.filter(app => app.id !== applicationId));
+      toast({
+        title: "Application Deleted",
+        description: `${applicantName}'s application has been removed`
+      });
+    } catch (error) {
+      console.error("Error deleting application:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete application",
+        variant: "destructive"
+      });
     }
   };
 
@@ -498,26 +526,54 @@ const JobApplicants = ({ jobId, jobTitle, onBack }: JobApplicantsProps) => {
                           )}
                         </TableCell>
                         <TableCell>
-                          <Select 
-                            value={applicant.status} 
-                            onValueChange={(value: string) => {
-                              if (isValidStatus(value)) {
-                                handleStatusChange(applicant.id, value);
-                              }
-                            }}
-                          >
-                            <SelectTrigger className="w-[130px]">
-                              <SelectValue placeholder="Change status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="new">New</SelectItem>
-                              <SelectItem value="reviewed">Reviewed</SelectItem>
-                              <SelectItem value="interviewing">Interviewing</SelectItem>
-                              <SelectItem value="rejected">Rejected</SelectItem>
-                              <SelectItem value="offered">Offered</SelectItem>
-                              <SelectItem value="hired">Hired</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <div className="flex gap-2">
+                            <Select 
+                              value={applicant.status} 
+                              onValueChange={(value: string) => {
+                                if (isValidStatus(value)) {
+                                  handleStatusChange(applicant.id, value);
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="w-[130px]">
+                                <SelectValue placeholder="Change status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="new">New</SelectItem>
+                                <SelectItem value="reviewed">Reviewed</SelectItem>
+                                <SelectItem value="interviewing">Interviewing</SelectItem>
+                                <SelectItem value="rejected">Rejected</SelectItem>
+                                <SelectItem value="offered">Offered</SelectItem>
+                                <SelectItem value="hired">Hired</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-700">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Application</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete {applicant.applicantName}'s application? 
+                                    This action cannot be undone and any associated analysis will also be deleted.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction 
+                                    onClick={() => handleDeleteApplication(applicant.id, applicant.applicantName)}
+                                    className="bg-red-500 hover:bg-red-700"
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}

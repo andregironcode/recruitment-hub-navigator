@@ -367,3 +367,30 @@ export const submitApplication = async (application: {
     throw new Error('Failed to submit application');
   }
 };
+
+/**
+ * Delete job application
+ */
+export const deleteApplication = async (id: number): Promise<void> => {
+  // First delete associated analysis record if exists
+  try {
+    await supabase
+      .from('application_analyses')
+      .delete()
+      .eq('application_id', id);
+  } catch (error) {
+    console.error('Error deleting application analysis:', error);
+    // Continue even if analysis delete fails
+  }
+
+  // Then delete the application
+  const { error } = await supabase
+    .from('applications')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('Error deleting application:', error);
+    throw new Error('Failed to delete application');
+  }
+};
