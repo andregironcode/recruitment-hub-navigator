@@ -244,7 +244,7 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-3.5-turbo',  // Using gpt-3.5-turbo instead of gpt-4o
+          model: 'gpt-4o-mini',  // Using gpt-4o-mini as requested
           messages: messages,
           temperature: 0.3,
         }),
