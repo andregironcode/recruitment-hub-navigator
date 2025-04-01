@@ -43,34 +43,112 @@ serve(async (req) => {
         resumeText = resumeContent;
       } else if (resumeUrl) {
         try {
-          // Check if it's a Supabase Storage URL or an external URL
+          console.log("Processing resume URL:", resumeUrl);
+          
+          // Check if it's a Supabase Storage URL (signed URL)
           if (resumeUrl.includes('supabase.co') || resumeUrl.includes('supabase.in')) {
-            // Parse the URL to get bucket and path
-            const url = new URL(resumeUrl);
-            const pathParts = url.pathname.split('/');
-            // Format typically: /storage/v1/object/public/bucket-name/path/to/file.pdf
+            console.log("Detected Supabase signed URL");
             
-            // Find the index of 'object' in the path
-            const objectIndex = pathParts.findIndex(part => part === 'object');
-            if (objectIndex !== -1) {
-              // Get the bucket (should be after 'public')
-              const bucketIndex = objectIndex + 2;
-              if (bucketIndex < pathParts.length) {
-                const bucket = pathParts[bucketIndex];
-                // Get everything after the bucket name as the path
-                const path = pathParts.slice(bucketIndex + 1).join('/');
+            // Try to download the content directly
+            try {
+              const response = await fetch(resumeUrl);
+              if (response.ok) {
+                const contentType = response.headers.get('content-type');
+                console.log("File content type:", contentType);
                 
-                if (bucket && path) {
-                  const { data, error } = await supabase.storage.from(bucket).download(path);
-                  if (error) {
-                    console.error("Error downloading file from Supabase Storage:", error);
-                  } else if (data) {
-                    // For simplicity, we'll assume it's a text-based file
-                    // In a real implementation, you would need to handle different file formats
-                    resumeText = await data.text();
+                // Handle different file types
+                if (contentType && contentType.includes('application/pdf')) {
+                  // For PDF, we need to extract text using OpenAI
+                  console.log("Processing PDF file, sending to OpenAI for text extraction");
+                  
+                  // We'll use OpenAI to extract text from the PDF
+                  const formData = new FormData();
+                  formData.append('file', await response.blob(), 'resume.pdf');
+                  formData.append('model', 'gpt-4o-mini');
+                  formData.append('purpose', 'assistants');
+                  
+                  const openAIResponse = await fetch('https://api.openai.com/v1/files', {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${openAIApiKey}`,
+                    },
+                    body: formData,
+                  });
+                  
+                  if (!openAIResponse.ok) {
+                    const errorText = await openAIResponse.text();
+                    console.error("Error uploading file to OpenAI:", errorText);
+                    throw new Error(`OpenAI file upload error: ${errorText}`);
                   }
+                  
+                  const fileData = await openAIResponse.json();
+                  console.log("File uploaded to OpenAI:", fileData.id);
+                  
+                  // Now use the file in a completion request
+                  const extractionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${openAIApiKey}`,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      model: 'gpt-4o-mini',
+                      messages: [
+                        { 
+                          role: 'system', 
+                          content: 'You are an assistant that extracts and summarizes text from PDF resumes. Extract all relevant information including skills, education, experience, certifications, and contact details.' 
+                        },
+                        { 
+                          role: 'user', 
+                          content: [
+                            { 
+                              type: 'text', 
+                              text: 'Please extract all text content from this resume PDF file. Include all information such as contact details, education, work history, skills, etc.' 
+                            },
+                            { 
+                              type: 'file_reference', 
+                              file_id: fileData.id 
+                            }
+                          ]
+                        }
+                      ]
+                    }),
+                  });
+                  
+                  if (!extractionResponse.ok) {
+                    const errorText = await extractionResponse.text();
+                    console.error("Error extracting text with OpenAI:", errorText);
+                    throw new Error(`OpenAI extraction error: ${errorText}`);
+                  }
+                  
+                  const extractionData = await extractionResponse.json();
+                  resumeText = extractionData.choices[0].message.content;
+                  
+                  // Clean up the file from OpenAI
+                  await fetch(`https://api.openai.com/v1/files/${fileData.id}`, {
+                    method: 'DELETE',
+                    headers: {
+                      'Authorization': `Bearer ${openAIApiKey}`,
+                    },
+                  });
+                  
+                  console.log("Successfully extracted text from PDF using OpenAI. First 100 chars:", resumeText.substring(0, 100));
+                } else if (contentType && (contentType.includes('text/plain') || contentType.includes('text/html'))) {
+                  // For text files, we can just read the content
+                  resumeText = await response.text();
+                  console.log("Successfully extracted text from text file. First 100 chars:", resumeText.substring(0, 100));
+                } else {
+                  // For other file types, we'll just note the type
+                  resumeText = `Resume in format ${contentType} was submitted. File needs special processing.`;
+                  console.log("Unsupported file type:", contentType);
                 }
+              } else {
+                console.error("Error fetching file from URL:", response.status, response.statusText);
+                resumeText = "Could not download the resume file.";
               }
+            } catch (fetchError) {
+              console.error("Error fetching resume from signed URL:", fetchError);
+              resumeText = "Error accessing resume file: " + fetchError.message;
             }
           } else if (resumeUrl.startsWith('blob:')) {
             // If it's a blob URL, we can't directly access it.
@@ -95,6 +173,7 @@ serve(async (req) => {
           }
         } catch (extractionError) {
           console.error("Error extracting resume text:", extractionError);
+          resumeText = "Error during resume text extraction: " + extractionError.message;
         }
       }
 

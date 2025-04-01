@@ -13,7 +13,8 @@ import {
   Share, 
   ArrowLeft,
   Send,
-  FileUp
+  FileUp,
+  Loader2
 } from 'lucide-react';
 import { getJobById, submitApplication } from '@/services/jobService';
 import { Job } from '@/components/jobs/JobList';
@@ -29,6 +30,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { supabase } from '@/integrations/supabase/client';
 
 const JobDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -44,6 +46,7 @@ const JobDetail = () => {
   });
   const [cvFile, setCvFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fileUploading, setFileUploading] = useState(false);
 
   useEffect(() => {
     const fetchJob = async () => {
@@ -87,6 +90,58 @@ const JobDetail = () => {
     }
   };
 
+  const uploadFileToStorage = async (file: File): Promise<string> => {
+    setFileUploading(true);
+    try {
+      // Create a unique file path with timestamp and random string
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+      const filePath = `resumes/${fileName}`;
+
+      // Check if storage bucket exists, create if not
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const resumeBucket = buckets?.find(b => b.name === 'resumes');
+      
+      if (!resumeBucket) {
+        const { error: createError } = await supabase.storage.createBucket('resumes', {
+          public: false,
+          fileSizeLimit: 10485760, // 10MB
+        });
+        
+        if (createError) {
+          console.error('Error creating bucket:', createError);
+          throw new Error('Failed to create storage bucket');
+        }
+      }
+
+      // Upload file
+      const { error: uploadError } = await supabase.storage
+        .from('resumes')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        console.error('Error uploading file:', uploadError);
+        throw new Error('Failed to upload resume');
+      }
+
+      // Get URL for the uploaded file
+      const { data: urlData } = await supabase.storage
+        .from('resumes')
+        .createSignedUrl(filePath, 60 * 60 * 24 * 30); // 30 days expiry
+
+      if (!urlData || !urlData.signedUrl) {
+        throw new Error('Failed to get resume URL');
+      }
+
+      return urlData.signedUrl;
+    } catch (error) {
+      console.error('File upload error:', error);
+      throw error;
+    } finally {
+      setFileUploading(false);
+    }
+  };
+
   const handleApply = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -95,13 +150,21 @@ const JobDetail = () => {
     setIsSubmitting(true);
     
     try {
-      // In a real application, we would upload the CV file to storage
-      // and get a URL back, but for this demo, we'll simulate it
+      // Upload the CV file to storage if provided
       let resumeUrl = '';
       if (cvFile) {
-        // Simulate file upload - in real app, upload to Supabase storage
-        resumeUrl = URL.createObjectURL(cvFile);
-        console.log('Uploaded CV file:', resumeUrl);
+        try {
+          resumeUrl = await uploadFileToStorage(cvFile);
+          console.log('Uploaded CV file:', resumeUrl);
+        } catch (uploadError) {
+          toast({
+            title: 'Upload Error',
+            description: 'Failed to upload your resume. Please try again.',
+            variant: 'destructive'
+          });
+          setIsSubmitting(false);
+          return;
+        }
       }
       
       // Submit the application
@@ -191,29 +254,29 @@ const JobDetail = () => {
                 <CardContent className="p-8">
                   <div className="mb-6">
                     <div className="flex items-start justify-between">
-                      <h1 className="text-3xl font-bold text-recruitment-dark mb-2">{job.title}</h1>
+                      <h1 className="text-3xl font-bold text-recruitment-dark mb-2">{job?.title}</h1>
                       <Button variant="outline" size="sm" className="flex items-center gap-1">
                         <Share size={14} /> Share
                       </Button>
                     </div>
                     <div className="flex items-center text-gray-600 flex-wrap gap-y-2">
                       <Building size={16} className="mr-1" />
-                      <span className="mr-4">{job.company}</span>
+                      <span className="mr-4">{job?.company}</span>
                       <MapPin size={16} className="mr-1" />
-                      <span className="mr-4">{job.location}</span>
+                      <span className="mr-4">{job?.location}</span>
                       <Clock size={16} className="mr-1" />
-                      <span>Posted {job.postedDate}</span>
+                      <span>Posted {job?.postedDate}</span>
                     </div>
                   </div>
 
                   <div className="flex flex-wrap gap-2 mb-6">
                     <Badge variant="outline" className="flex items-center">
-                      <Briefcase size={14} className="mr-1" /> {job.jobType}
+                      <Briefcase size={14} className="mr-1" /> {job?.jobType}
                     </Badge>
                     <Badge variant="outline" className="flex items-center">
-                      <Clock size={14} className="mr-1" /> {job.industry}
+                      <Clock size={14} className="mr-1" /> {job?.industry}
                     </Badge>
-                    {job.featured && (
+                    {job?.featured && (
                       <Badge className="bg-recruitment-accent text-white">Featured</Badge>
                     )}
                   </div>
@@ -222,7 +285,7 @@ const JobDetail = () => {
                     <h2 className="text-xl font-semibold mb-4 text-recruitment-dark">Job Description</h2>
                     <div 
                       className="text-gray-600 prose prose-sm max-w-none" 
-                      dangerouslySetInnerHTML={{ __html: job.description }}
+                      dangerouslySetInnerHTML={{ __html: job?.description || '' }}
                     />
                   </div>
                 </CardContent>
@@ -238,19 +301,19 @@ const JobDetail = () => {
                   <div className="space-y-4 mb-6">
                     <div>
                       <div className="text-sm text-gray-500">Salary</div>
-                      <div className="font-medium text-recruitment-primary">{job.salary}</div>
+                      <div className="font-medium text-recruitment-primary">{job?.salary}</div>
                     </div>
                     <div>
                       <div className="text-sm text-gray-500">Job Type</div>
-                      <div>{job.jobType}</div>
+                      <div>{job?.jobType}</div>
                     </div>
                     <div>
                       <div className="text-sm text-gray-500">Location</div>
-                      <div>{job.location}</div>
+                      <div>{job?.location}</div>
                     </div>
                     <div>
                       <div className="text-sm text-gray-500">Industry</div>
-                      <div>{job.industry}</div>
+                      <div>{job?.industry}</div>
                     </div>
                   </div>
                   
@@ -275,9 +338,9 @@ const JobDetail = () => {
       <Dialog open={isApplyDialogOpen} onOpenChange={setIsApplyDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Apply for {job.title}</DialogTitle>
+            <DialogTitle>Apply for {job?.title}</DialogTitle>
             <DialogDescription>
-              Submit your application for this position at {job.company}.
+              Submit your application for this position at {job?.company}.
             </DialogDescription>
           </DialogHeader>
           
@@ -354,15 +417,25 @@ const JobDetail = () => {
                 variant="outline" 
                 type="button" 
                 onClick={() => setIsApplyDialogOpen(false)}
+                disabled={isSubmitting || fileUploading}
               >
                 Cancel
               </Button>
               <Button 
                 type="submit" 
-                disabled={isSubmitting}
+                disabled={isSubmitting || fileUploading}
                 className="bg-recruitment-primary hover:bg-recruitment-primary/90"
               >
-                {isSubmitting ? 'Submitting...' : <><Send className="mr-2 h-4 w-4" /> Submit Application</>}
+                {(isSubmitting || fileUploading) ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
+                    {fileUploading ? 'Uploading...' : 'Submitting...'}
+                  </>
+                ) : (
+                  <>
+                    <Send className="mr-2 h-4 w-4" /> Submit Application
+                  </>
+                )}
               </Button>
             </DialogFooter>
           </form>

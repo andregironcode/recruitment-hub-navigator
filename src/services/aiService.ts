@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ResumeAnalysis {
@@ -28,6 +29,7 @@ export const analyzeResume = async (
       try {
         // Log this limitation
         console.log('Attempting to extract content from blob URL:', resumeUrl);
+        console.error('Blob URLs cannot be processed by the server. Please upload files to storage first.');
       } catch (err) {
         console.warn('Unable to extract content from blob URL:', err);
       }
