@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -61,6 +60,7 @@ const JobDetail = () => {
         setBucketError(result.error?.message || 'Could not access storage bucket');
       } else {
         setBucketError(null);
+        console.log('Bucket is accessible');
       }
     };
     
