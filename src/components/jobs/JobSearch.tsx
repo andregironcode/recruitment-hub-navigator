@@ -81,7 +81,7 @@ const JobSearch: React.FC<JobSearchProps> = ({ onSearch }) => {
                 <SelectValue placeholder="All Industries" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Industries</SelectItem>
+                <SelectItem value="all-industries">All Industries</SelectItem>
                 <SelectItem value="technology">Technology</SelectItem>
                 <SelectItem value="finance">Finance</SelectItem>
                 <SelectItem value="healthcare">Healthcare</SelectItem>
@@ -104,7 +104,7 @@ const JobSearch: React.FC<JobSearchProps> = ({ onSearch }) => {
                 <SelectValue placeholder="All Types" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Types</SelectItem>
+                <SelectItem value="all-types">All Types</SelectItem>
                 <SelectItem value="full-time">Full-Time</SelectItem>
                 <SelectItem value="part-time">Part-Time</SelectItem>
                 <SelectItem value="contract">Contract</SelectItem>
