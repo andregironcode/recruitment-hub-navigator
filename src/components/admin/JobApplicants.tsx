@@ -163,12 +163,15 @@ const JobApplicants = ({ jobId, jobTitle, onBack }: JobApplicantsProps) => {
       
       for (const applicant of applicantsWithResumes) {
         try {
+          console.log(`Processing applicant ${applicant.id}: ${applicant.applicantName}`);
           const analysis = await analyzeResume({
             resumeUrl: applicant.resumeUrl,
             jobDescription: jobDescription,
             jobId: jobId,
             applicantId: applicant.id
           });
+          
+          console.log(`Analysis received for ${applicant.applicantName}:`, analysis);
           
           const index = updatedApplicants.findIndex(a => a.id === applicant.id);
           if (index !== -1) {
@@ -198,6 +201,7 @@ const JobApplicants = ({ jobId, jobTitle, onBack }: JobApplicantsProps) => {
         }
       }
       
+      console.log('Final applicants data after analysis:', updatedApplicants);
       setApplicants(updatedApplicants);
       
       if (errorCount === totalApplicants) {

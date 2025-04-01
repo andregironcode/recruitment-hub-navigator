@@ -64,6 +64,7 @@ export async function analyzeResume({
     }
 
     const data = await response.json();
+    console.log('Received analysis result:', data);
     
     // Store the analysis result in the database directly if jobId and applicantId are provided
     if (jobId && applicantId) {
@@ -77,7 +78,7 @@ export async function analyzeResume({
         
         if (existingAnalysis) {
           // Update existing analysis
-          await supabase
+          const { error: updateError } = await supabase
             .from('application_analyses')
             .update({
               education_level: data.educationLevel || 'Not available',
@@ -90,9 +91,15 @@ export async function analyzeResume({
               analyzed_at: new Date().toISOString()
             })
             .eq('id', existingAnalysis.id);
+            
+          if (updateError) {
+            console.error('Error updating analysis:', updateError);
+          } else {
+            console.log('Updated existing analysis for application:', applicantId);
+          }
         } else {
           // Insert new analysis
-          await supabase
+          const { error: insertError } = await supabase
             .from('application_analyses')
             .insert({
               application_id: applicantId,
@@ -105,6 +112,12 @@ export async function analyzeResume({
               overall_score: data.overallScore || 0,
               fallback: data.fallback || false
             });
+            
+          if (insertError) {
+            console.error('Error inserting analysis:', insertError);
+          } else {
+            console.log('Inserted new analysis for application:', applicantId);
+          }
         }
       } catch (error) {
         console.error('Error storing analysis in database:', error);
