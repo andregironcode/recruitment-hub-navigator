@@ -44,8 +44,8 @@ export const checkStorageBuckets = async () => {
     
     console.log('Available buckets:', buckets);
     
-    // Don't try to create the bucket - assume it should exist via migration
-    // Just check if the resume bucket exists
+    // Just check if the resume bucket exists - we no longer try to create it
+    // as this is now handled by the SQL migration
     const resumesBucket = buckets?.find(bucket => 
       bucket.id === RESUME_BUCKET_ID || 
       bucket.name === 'Resumes Storage'
