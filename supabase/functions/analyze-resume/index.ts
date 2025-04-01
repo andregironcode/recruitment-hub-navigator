@@ -35,27 +35,91 @@ serve(async (req) => {
         console.log("OpenAI API key is not configured");
         throw new Error("OpenAI API key is not configured");
       }
+      
+      // Extract text from the resume
+      let resumeText = "Could not extract resume text.";
+      
+      if (resumeUrl) {
+        try {
+          // Check if it's a Supabase Storage URL or an external URL
+          if (resumeUrl.includes('supabase.co') || resumeUrl.includes('supabase.in')) {
+            // Parse the URL to get bucket and path
+            const url = new URL(resumeUrl);
+            const pathParts = url.pathname.split('/');
+            // Format typically: /storage/v1/object/public/bucket-name/path/to/file.pdf
+            
+            // Find the index of 'object' in the path
+            const objectIndex = pathParts.findIndex(part => part === 'object');
+            if (objectIndex !== -1) {
+              // Get the bucket (should be after 'public')
+              const bucketIndex = objectIndex + 2;
+              if (bucketIndex < pathParts.length) {
+                const bucket = pathParts[bucketIndex];
+                // Get everything after the bucket name as the path
+                const path = pathParts.slice(bucketIndex + 1).join('/');
+                
+                if (bucket && path) {
+                  const { data, error } = await supabase.storage.from(bucket).download(path);
+                  if (error) {
+                    console.error("Error downloading file from Supabase Storage:", error);
+                  } else if (data) {
+                    // For simplicity, we'll assume it's a text-based file
+                    // In a real implementation, you would need to handle different file formats
+                    resumeText = await data.text();
+                  }
+                }
+              }
+            }
+          } else if (resumeUrl.startsWith('blob:')) {
+            // If it's a blob URL, we can't directly access it.
+            // In a production system, you would need to have the client upload the file
+            resumeText = "This resume was submitted as a temporary blob URL. In a production system, please upload files to permanent storage.";
+          } else {
+            // Try to fetch the content if it's an accessible URL
+            try {
+              const response = await fetch(resumeUrl);
+              if (response.ok) {
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('text')) {
+                  resumeText = await response.text();
+                } else {
+                  resumeText = "Retrieved non-text content that requires special processing.";
+                }
+              }
+            } catch (fetchError) {
+              console.error("Error fetching resume content:", fetchError);
+              resumeText = "Could not fetch resume content from URL.";
+            }
+          }
+        } catch (extractionError) {
+          console.error("Error extracting resume text:", extractionError);
+        }
+      }
 
-      // Note: We're currently using a demonstration mode that doesn't actually parse resumes
-      // In a production system, you would extract and analyze the actual resume content
       const prompt = `
       You are an expert HR AI assistant that analyzes job applications.
       
       Job Description: ${jobDescription}
       
-      IMPORTANT NOTE: This is a demonstration version that does not actually parse resume content.
-      Please generate a simulated analysis for demonstration purposes only.
-      Label any outputs clearly as "DEMO MODE" to indicate this is not a real analysis.
+      Resume Content:
+      ${resumeText}
+      
+      Analyze the resume against the job description and provide:
+      1. The candidate's education level
+      2. Years of experience in relevant fields
+      3. How well the candidate's skills match the job requirements
+      4. Key skills found in the resume that are relevant to the job
+      5. Important requirements from the job description that appear to be missing from the resume
+      6. An overall match score from 0-100
       
       Return ONLY valid JSON with these fields:
       {
-        "educationLevel": string (choose randomly from "High School", "Bachelor's Degree", "Master's Degree", "PhD", "Associate's Degree"),
-        "yearsExperience": string (choose randomly from "<1", "1-3", "3-5", "5+", "7+", "10+"),
-        "skillsMatch": string (choose randomly from "Low", "Medium", "High"),
-        "keySkills": string[] (list up to 5 skills that would be relevant based on the job description),
-        "missingRequirements": string[] (list up to 3 potential missing skills based on the job description),
-        "overallScore": number (generate a realistic score between 30-95),
-        "demoMode": true
+        "educationLevel": string (e.g., "High School", "Bachelor's Degree", "Master's Degree", "PhD", "Associate's Degree"),
+        "yearsExperience": string (e.g., "<1", "1-3", "3-5", "5+", "7+", "10+"),
+        "skillsMatch": string (choose from "Low", "Medium", "High"),
+        "keySkills": string[] (list up to 5 skills that are relevant based on the job description),
+        "missingRequirements": string[] (list up to 3 potential missing requirements based on the job description),
+        "overallScore": number (a realistic score between 0-100)
       }
       `;
 
@@ -89,12 +153,17 @@ serve(async (req) => {
         // Handle the case where GPT wraps the JSON in markdown code blocks
         if (resultContent.includes('```json')) {
           resultContent = resultContent.replace(/```json\n|\n```/g, '');
+        } else if (resultContent.includes('```')) {
+          resultContent = resultContent.replace(/```\n|\n```/g, '');
         }
         
-        const analysisResult = JSON.parse(resultContent);
-        
-        // Ensure demoMode is set
-        analysisResult.demoMode = true;
+        let analysisResult;
+        try {
+          analysisResult = JSON.parse(resultContent);
+        } catch (parseError) {
+          console.error("Error parsing OpenAI response:", parseError, "Response was:", resultContent);
+          throw new Error("Failed to parse AI analysis response");
+        }
         
         // Store the analysis result in the database if we have jobId and applicantId
         if (jobId && applicantId) {
@@ -124,10 +193,9 @@ serve(async (req) => {
       } catch (openAiError) {
         console.error("OpenAI API call failed:", openAiError.message);
         
-        // Generate a fallback analysis without calling OpenAI
-        const fallbackAnalysis = generateFallbackAnalysis(jobDescription);
-        fallbackAnalysis.demoMode = true;
-
+        // Generate a fallback analysis
+        const fallbackAnalysis = generateFallbackAnalysis(jobDescription, resumeText);
+        
         // Store the fallback analysis if we have jobId and applicantId
         if (jobId && applicantId) {
           try {
@@ -158,8 +226,7 @@ serve(async (req) => {
           JSON.stringify({
             ...fallbackAnalysis,
             _note: "Generated without OpenAI due to API limitations",
-            fallback: true,
-            demoMode: true
+            fallback: true
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -168,16 +235,14 @@ serve(async (req) => {
       console.error("AI analysis error:", aiError);
       
       // Generate a fallback analysis
-      const fallbackAnalysis = generateFallbackAnalysis(jobDescription);
-      fallbackAnalysis.demoMode = true;
+      const fallbackAnalysis = generateFallbackAnalysis(jobDescription, "");
       
       return new Response(
         JSON.stringify({
           ...fallbackAnalysis,
           _note: "Fallback analysis due to API error",
           _error: aiError.message,
-          fallback: true,
-          demoMode: true
+          fallback: true
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -189,44 +254,98 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         error: "Function failed: " + error.message,
-        fallback: true,
-        demoMode: true
+        fallback: true
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
 
-// Fallback analysis generator that doesn't use OpenAI API
-function generateFallbackAnalysis(jobDescription: string) {
-  // Extract some keywords from job description to use for "smart" fallback
+// Fallback analysis generator that attempts to extract some info from resume text
+function generateFallbackAnalysis(jobDescription: string, resumeText: string) {
+  // Extract some keywords from job description and resume to use for "smart" fallback
   const lowercaseDesc = jobDescription.toLowerCase();
+  const lowercaseResume = resumeText.toLowerCase();
   
-  // Education level prediction based on keywords
+  // Education level detection from resume
   let educationLevel = "Bachelor's Degree"; // Default
-  if (lowercaseDesc.includes("phd") || lowercaseDesc.includes("doctorate") || lowercaseDesc.includes("research")) {
+  if (lowercaseResume.includes("phd") || lowercaseResume.includes("doctorate") || lowercaseResume.includes("doctor of")) {
     educationLevel = "PhD";
-  } else if (lowercaseDesc.includes("master") || lowercaseDesc.includes("mba") || lowercaseDesc.includes("advanced degree")) {
+  } else if (lowercaseResume.includes("master") || lowercaseResume.includes("mba") || lowercaseResume.includes("ms in") || lowercaseResume.includes("m.s")) {
     educationLevel = "Master's Degree";
-  } else if (lowercaseDesc.includes("high school") || lowercaseDesc.includes("entry level")) {
+  } else if (lowercaseResume.includes("high school") && !lowercaseResume.includes("bachelor") && !lowercaseResume.includes("college degree")) {
     educationLevel = "High School";
-  } else if (lowercaseDesc.includes("associate") || lowercaseDesc.includes("certificate")) {
+  } else if (lowercaseResume.includes("associate") || lowercaseResume.includes("a.a.") || lowercaseResume.includes("a.a")) {
     educationLevel = "Associate's Degree";
   }
 
-  // Experience level prediction
-  let yearsExperience = "3-5"; // Default
-  if (lowercaseDesc.includes("senior") || lowercaseDesc.includes("lead") || lowercaseDesc.includes("manager")) {
-    yearsExperience = "5+";
-  } else if (lowercaseDesc.includes("principal") || lowercaseDesc.includes("director") || lowercaseDesc.includes("head")) {
-    yearsExperience = "10+";
-  } else if (lowercaseDesc.includes("junior") || lowercaseDesc.includes("entry")) {
-    yearsExperience = "1-3";
-  } else if (lowercaseDesc.includes("intern") || lowercaseDesc.includes("trainee")) {
-    yearsExperience = "<1";
+  // Fallback to job description requirements if resume doesn't contain education info
+  if (educationLevel === "Bachelor's Degree" && resumeText.length < 100) {
+    if (lowercaseDesc.includes("phd") || lowercaseDesc.includes("doctorate") || lowercaseDesc.includes("research")) {
+      educationLevel = "PhD";
+    } else if (lowercaseDesc.includes("master") || lowercaseDesc.includes("mba") || lowercaseDesc.includes("advanced degree")) {
+      educationLevel = "Master's Degree";
+    } else if (lowercaseDesc.includes("high school") || lowercaseDesc.includes("entry level")) {
+      educationLevel = "High School";
+    } else if (lowercaseDesc.includes("associate") || lowercaseDesc.includes("certificate")) {
+      educationLevel = "Associate's Degree";
+    }
   }
 
-  // Detect some common skills from job description
+  // Experience level prediction from resume
+  let yearsExperience = "3-5"; // Default
+  
+  // Try to find years of experience mentions in the resume
+  const experiencePatterns = [
+    { pattern: /(\d+)\+?\s*years? of experience/i, handler: (match: string[]) => parseInt(match[1]) },
+    { pattern: /experience\D*(\d+)\+?\s*years?/i, handler: (match: string[]) => parseInt(match[1]) },
+    { pattern: /(\d+)\+?\s*years? in/i, handler: (match: string[]) => parseInt(match[1]) },
+    { pattern: /(\d{4})\s*-\s*present/i, handler: (match: string[]) => new Date().getFullYear() - parseInt(match[1]) },
+    { pattern: /(\d{4})\s*-\s*(\d{4})/gi, handler: (match: string[]) => {
+      // Get all year ranges and sum them up
+      let totalYears = 0;
+      let matches;
+      while ((matches = /(\d{4})\s*-\s*(\d{4})/gi.exec(resumeText)) !== null) {
+        const startYear = parseInt(matches[1]);
+        const endYear = parseInt(matches[2]);
+        if (endYear > startYear && endYear <= new Date().getFullYear()) {
+          totalYears += (endYear - startYear);
+        }
+      }
+      return totalYears;
+    }}
+  ];
+  
+  let foundYears = 0;
+  for (const { pattern, handler } of experiencePatterns) {
+    const match = lowercaseResume.match(pattern);
+    if (match) {
+      foundYears = handler(match);
+      break;
+    }
+  }
+  
+  if (foundYears > 0) {
+    if (foundYears < 1) yearsExperience = "<1";
+    else if (foundYears >= 1 && foundYears < 3) yearsExperience = "1-3";
+    else if (foundYears >= 3 && foundYears < 5) yearsExperience = "3-5";
+    else if (foundYears >= 5 && foundYears < 7) yearsExperience = "5+";
+    else if (foundYears >= 7 && foundYears < 10) yearsExperience = "7+";
+    else yearsExperience = "10+";
+  } else {
+    // Fallback to job title inference if no explicit years found
+    if (lowercaseResume.includes("senior") || lowercaseResume.includes("lead") || lowercaseResume.includes("manager")) {
+      yearsExperience = "5+";
+    } else if (lowercaseResume.includes("principal") || lowercaseResume.includes("director") || lowercaseResume.includes("head")) {
+      yearsExperience = "10+";
+    } else if (lowercaseResume.includes("junior") || lowercaseResume.includes("entry")) {
+      yearsExperience = "1-3";
+    } else if (lowercaseResume.includes("intern") || lowercaseResume.includes("trainee")) {
+      yearsExperience = "<1";
+    }
+  }
+
+  // Detect skills from job description and resume
   const potentialSkills = [
     { term: "javascript", skill: "JavaScript" },
     { term: "react", skill: "React" },
@@ -260,15 +379,29 @@ function generateFallbackAnalysis(jobDescription: string) {
     { term: "research", skill: "Research" }
   ];
   
-  const detectedSkills = potentialSkills
+  // Find skills mentioned in the resume
+  const resumeSkills = potentialSkills
+    .filter(item => lowercaseResume.includes(item.term))
+    .map(item => item.skill);
+  
+  // Find skills mentioned in the job description
+  const jobSkills = potentialSkills
     .filter(item => lowercaseDesc.includes(item.term))
     .map(item => item.skill);
   
-  // Randomize and limit skills to 5 max
-  const shuffledSkills = [...detectedSkills].sort(() => 0.5 - Math.random());
-  const keySkills = shuffledSkills.slice(0, Math.min(5, shuffledSkills.length));
+  // Matching skills (intersection of resume skills and job skills)
+  const matchingSkills = resumeSkills.filter(skill => jobSkills.includes(skill));
   
-  // If we couldn't detect enough skills, add some generic ones
+  // Key skills to highlight (prioritize matching skills, but include some resume skills if needed)
+  let keySkills = [...matchingSkills];
+  if (keySkills.length < 5) {
+    const additionalSkills = resumeSkills
+      .filter(skill => !keySkills.includes(skill))
+      .slice(0, 5 - keySkills.length);
+    keySkills = [...keySkills, ...additionalSkills];
+  }
+  
+  // If we still don't have enough skills, add some generic ones
   if (keySkills.length < 3) {
     const genericSkills = ["Communication", "Problem Solving", "Time Management", "Attention to Detail", "Teamwork"];
     while (keySkills.length < 5) {
@@ -279,23 +412,33 @@ function generateFallbackAnalysis(jobDescription: string) {
     }
   }
   
-  // Generate missing requirements - skills not mentioned but might be relevant
-  const missingSkills = potentialSkills
-    .filter(item => !lowercaseDesc.includes(item.term))
-    .map(item => item.skill)
-    .sort(() => 0.5 - Math.random())
+  // Limit to 5 skills
+  keySkills = keySkills.slice(0, 5);
+  
+  // Missing requirements - job skills not found in resume
+  const missingSkills = jobSkills
+    .filter(skill => !resumeSkills.includes(skill))
     .slice(0, 3);
   
-  // Generate a somewhat realistic score
-  const overallScore = Math.floor(Math.random() * 25) + 60; // 60-84 range
+  // Calculate skills match percentage based on matching skills vs job skills
+  const matchPercentage = jobSkills.length > 0 
+    ? Math.round((matchingSkills.length / jobSkills.length) * 100)
+    : 70; // Default if no job skills detected
+  
+  // Adjust for resume quality/length
+  const overallScore = resumeText.length > 500
+    ? matchPercentage
+    : Math.max(30, Math.round(matchPercentage * 0.7)); // Penalize very short or empty resumes
+  
+  // Determine skill match level based on score
+  const skillsMatch = overallScore > 75 ? "High" : overallScore > 60 ? "Medium" : "Low";
   
   return {
     educationLevel,
     yearsExperience,
-    skillsMatch: overallScore > 75 ? "High" : overallScore > 60 ? "Medium" : "Low",
+    skillsMatch,
     keySkills,
     missingRequirements: missingSkills,
-    overallScore,
-    demoMode: true
+    overallScore
   };
 }

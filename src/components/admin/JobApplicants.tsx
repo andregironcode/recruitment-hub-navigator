@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { getApplicationsByJobId, updateApplicationStatus, getJobById } from "@/services/jobService";
 import { getJobApplicationsAnalyses, analyzeResume, ResumeAnalysis } from "@/services/aiService";
@@ -322,7 +323,7 @@ const JobApplicants = ({ jobId, jobTitle, onBack }: JobApplicantsProps) => {
 
   const groupedApplicants = groupApplicants();
   const hasAnyAnalysis = applicants.some(app => !!app.analysis);
-  const isDemoMode = applicants.some(app => app.analysis?.demoMode);
+  const hasFallbackAnalyses = applicants.some(app => app.analysis?.fallback);
 
   return (
     <div className="space-y-4">
@@ -336,14 +337,13 @@ const JobApplicants = ({ jobId, jobTitle, onBack }: JobApplicantsProps) => {
         </h2>
       </div>
 
-      {isDemoMode && (
-        <Alert className="bg-blue-50 border-blue-200">
-          <InfoIcon className="h-4 w-4 text-blue-500" />
-          <AlertTitle className="text-blue-700">Demo Analysis Mode</AlertTitle>
-          <AlertDescription className="text-blue-600">
-            The AI resume analysis is running in demonstration mode. It does not actually read resume contents
-            but generates plausible analysis based on the job description. For a production system, you would need
-            to implement resume content extraction and proper analysis.
+      {hasFallbackAnalyses && (
+        <Alert className="bg-amber-50 border-amber-200">
+          <InfoIcon className="h-4 w-4 text-amber-500" />
+          <AlertTitle className="text-amber-700">Some analyses may be limited</AlertTitle>
+          <AlertDescription className="text-amber-600">
+            Some of the resume analyses were generated using fallback algorithms due to API limitations.
+            These analyses may be less accurate than full AI analyses.
           </AlertDescription>
         </Alert>
       )}
@@ -606,6 +606,9 @@ const JobApplicants = ({ jobId, jobTitle, onBack }: JobApplicantsProps) => {
                         <span className={`ml-2 px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getMatchColor(applicant.analysis?.skillsMatch || '')}`}>
                           {applicant.analysis?.overallScore}% Match
                         </span>
+                        {applicant.analysis?.fallback && (
+                          <Badge variant="outline" className="ml-2 bg-amber-50">Fallback Analysis</Badge>
+                        )}
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
