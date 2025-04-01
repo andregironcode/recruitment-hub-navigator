@@ -26,10 +26,25 @@ export const supabase = createClient<Database>(
   }
 );
 
+// Explicitly set the bucket ID for consistency
+export const RESUME_BUCKET_ID = 'resumes';
+
 // Check if storage buckets are accessible
 export const checkStorageBuckets = async () => {
   try {
-    // We don't attempt to create the bucket anymore, just check if we can access it
+    console.log('Checking storage buckets accessibility...');
+    
+    // First, try to directly access the resumes bucket
+    const { data: bucketData, error: bucketError } = await supabase.storage.getBucket(RESUME_BUCKET_ID);
+    
+    if (!bucketError && bucketData) {
+      console.log('Resumes bucket exists and is accessible via direct check:', bucketData);
+      return { success: true };
+    }
+    
+    console.log('Direct bucket check failed, trying to list buckets...');
+    
+    // If direct access fails, try listing all buckets
     const { data: buckets, error } = await supabase.storage.listBuckets();
     
     if (error) {
@@ -37,13 +52,18 @@ export const checkStorageBuckets = async () => {
       return { success: false, error };
     }
     
-    // Check for the bucket with the correct name
+    console.log('Available buckets:', buckets);
+    
+    // Check for the bucket with multiple possible identifiers
     const resumesBucketExists = buckets?.some(bucket => 
-      bucket.name === 'Resumes Storage' || bucket.id === 'resumes'
+      bucket.name === 'Resumes Storage' || 
+      bucket.id === RESUME_BUCKET_ID ||
+      bucket.id.toLowerCase() === RESUME_BUCKET_ID.toLowerCase() ||
+      bucket.name === RESUME_BUCKET_ID
     );
     
     if (!resumesBucketExists) {
-      console.warn('Resumes bucket does not exist. This should have been created via SQL migration.');
+      console.warn('Resumes bucket not found. Available buckets:', buckets?.map(b => `${b.id} (${b.name})`));
       return { 
         success: false, 
         error: new Error('Resumes bucket does not exist. File uploads will not work.')
