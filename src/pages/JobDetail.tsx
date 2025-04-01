@@ -14,7 +14,8 @@ import {
   Send,
   FileUp,
   Loader2,
-  AlertTriangle
+  AlertTriangle,
+  InfoIcon
 } from 'lucide-react';
 import { getJobById, submitApplication } from '@/services/jobService';
 import { Job } from '@/components/jobs/JobList';
@@ -30,7 +31,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase, checkStorageBuckets, RESUME_BUCKET_ID } from '@/integrations/supabase/client';
+import { supabase, checkStorageBuckets, RESUME_BUCKET_ID, uploadResumeFile } from '@/integrations/supabase/client';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const JobDetail = () => {
@@ -50,18 +51,22 @@ const JobDetail = () => {
   const [fileUploading, setFileUploading] = useState(false);
   const [bucketAccessible, setBucketAccessible] = useState(false);
   const [bucketError, setBucketError] = useState<string | null>(null);
+  const [bucketChecking, setBucketChecking] = useState(false);
 
   useEffect(() => {
     const checkBucket = async () => {
+      setBucketChecking(true);
       const result = await checkStorageBuckets();
       setBucketAccessible(result.success);
+      
       if (!result.success) {
         console.warn('Storage bucket check failed:', result.error);
         setBucketError(result.error?.message || 'Could not access storage bucket');
       } else {
         setBucketError(null);
-        console.log('Bucket is accessible');
+        console.log('Bucket is accessible:', result.bucketInfo);
       }
+      setBucketChecking(false);
     };
     
     checkBucket();
@@ -107,75 +112,6 @@ const JobDetail = () => {
     }
   };
 
-  const uploadFileToStorage = async (file: File): Promise<string> => {
-    setFileUploading(true);
-    try {
-      console.log('Starting file upload for', file.name);
-      
-      // Check bucket access before uploading
-      const checkResult = await checkStorageBuckets();
-      if (!checkResult.success) {
-        console.error('Storage bucket check failed:', checkResult.error);
-        setBucketError(checkResult.error?.message || 'Could not access storage bucket');
-        throw new Error(checkResult.error?.message || 'Storage bucket not accessible');
-      }
-      
-      setBucketAccessible(true);
-      setBucketError(null);
-      
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-      const filePath = `${fileName}`;
-      
-      console.log(`Uploading file to ${RESUME_BUCKET_ID} bucket...`);
-      const { error: uploadError, data: uploadData } = await supabase.storage
-        .from(RESUME_BUCKET_ID)
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) {
-        console.error('Error uploading file:', uploadError);
-        
-        if (uploadError.message.includes('The resource was not found')) {
-          throw new Error(`Storage bucket "${RESUME_BUCKET_ID}" not found. Please ensure the storage bucket exists in Supabase.`);
-        }
-        
-        if (uploadError.message.includes('row-level security policy')) {
-          throw new Error('Permission denied: Cannot upload file due to security restrictions.');
-        }
-        
-        throw new Error(`Failed to upload resume: ${uploadError.message}`);
-      }
-
-      if (!uploadData || !uploadData.path) {
-        throw new Error('Upload failed - no data returned from server');
-      }
-
-      const { data: publicUrlData } = supabase.storage
-        .from(RESUME_BUCKET_ID)
-        .getPublicUrl(uploadData.path);
-
-      if (!publicUrlData || !publicUrlData.publicUrl) {
-        throw new Error('Failed to get resume URL');
-      }
-
-      console.log('File uploaded successfully, URL obtained:', publicUrlData.publicUrl);
-      return publicUrlData.publicUrl;
-    } catch (error) {
-      console.error('File upload error:', error);
-      toast({
-        title: 'Upload Error',
-        description: error instanceof Error ? error.message : 'An unknown error occurred during file upload',
-        variant: 'destructive'
-      });
-      throw error;
-    } finally {
-      setFileUploading(false);
-    }
-  };
-
   const handleApply = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -187,12 +123,24 @@ const JobDetail = () => {
       let resumeUrl = '';
       if (cvFile) {
         try {
-          resumeUrl = await uploadFileToStorage(cvFile);
-          console.log('Uploaded CV file:', resumeUrl);
+          setFileUploading(true);
+          const uploadResult = await uploadResumeFile(cvFile);
+          
+          if (uploadResult.error) {
+            throw uploadResult.error;
+          }
+          
+          if (uploadResult.url) {
+            resumeUrl = uploadResult.url;
+            console.log('Uploaded CV file:', resumeUrl);
+          }
+          
+          setFileUploading(false);
         } catch (uploadError) {
+          setFileUploading(false);
           toast({
             title: 'Upload Error',
-            description: 'Failed to upload your resume. Please try again.',
+            description: uploadError instanceof Error ? uploadError.message : 'Failed to upload your resume. Please try again.',
             variant: 'destructive'
           });
           setIsSubmitting(false);
@@ -373,13 +321,23 @@ const JobDetail = () => {
             </DialogDescription>
           </DialogHeader>
           
+          {bucketChecking && (
+            <Alert className="mt-2">
+              <InfoIcon className="h-4 w-4" />
+              <AlertTitle>Checking storage...</AlertTitle>
+              <AlertDescription>
+                Verifying resume storage availability...
+              </AlertDescription>
+            </Alert>
+          )}
+          
           {bucketError && (
             <Alert variant="destructive" className="mt-2">
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>Storage Error</AlertTitle>
               <AlertDescription>
                 {bucketError}
-                <p className="text-xs mt-1">Resume uploads may not work. Please contact support.</p>
+                <p className="text-xs mt-1">Resume uploads may not work. Your application can still be submitted without a resume.</p>
               </AlertDescription>
             </Alert>
           )}
@@ -428,7 +386,7 @@ const JobDetail = () => {
                   accept=".pdf,.doc,.docx"
                   onChange={handleFileChange}
                   className="flex-1"
-                  disabled={!bucketAccessible}
+                  disabled={bucketChecking || (!bucketAccessible && !bucketChecking)}
                 />
                 {cvFile && (
                   <Badge variant="outline" className="flex items-center gap-1">
@@ -437,8 +395,8 @@ const JobDetail = () => {
                 )}
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                Accepted formats: PDF, DOC, DOCX (Max 5MB)
-                {!bucketAccessible && <span className="text-red-500 ml-2">Resume upload currently unavailable</span>}
+                Accepted formats: PDF, DOC, DOCX (Max 10MB)
+                {!bucketAccessible && !bucketChecking && <span className="text-red-500 ml-2">Resume upload currently unavailable</span>}
               </p>
             </div>
             
@@ -471,7 +429,7 @@ const JobDetail = () => {
                 {(isSubmitting || fileUploading) ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
-                    {fileUploading ? 'Uploading...' : 'Submitting...'}
+                    {fileUploading ? 'Uploading Resume...' : 'Submitting Application...'}
                   </>
                 ) : (
                   <>

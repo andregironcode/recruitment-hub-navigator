@@ -34,46 +34,106 @@ export const checkStorageBuckets = async () => {
   try {
     console.log('Checking storage buckets accessibility...');
     
-    // First, try to directly access the resumes bucket
-    const { data: bucketData, error: bucketError } = await supabase.storage.getBucket(RESUME_BUCKET_ID);
+    // First, try to list all buckets to see what's available
+    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
     
-    if (!bucketError && bucketData) {
-      console.log('Resumes bucket exists and is accessible via direct check:', bucketData);
-      return { success: true };
-    }
-    
-    console.log('Direct bucket check failed, trying to list buckets...');
-    
-    // If direct access fails, try listing all buckets
-    const { data: buckets, error } = await supabase.storage.listBuckets();
-    
-    if (error) {
-      console.error('Error listing buckets:', error);
-      return { success: false, error };
+    if (listError) {
+      console.error('Error listing buckets:', listError);
+      return { success: false, error: listError };
     }
     
     console.log('Available buckets:', buckets);
     
-    // Check for the bucket with multiple possible identifiers
-    const resumesBucketExists = buckets?.some(bucket => 
-      bucket.name === 'Resumes Storage' || 
-      bucket.id === RESUME_BUCKET_ID ||
-      bucket.id.toLowerCase() === RESUME_BUCKET_ID.toLowerCase() ||
-      bucket.name === RESUME_BUCKET_ID
-    );
-    
-    if (!resumesBucketExists) {
-      console.warn('Resumes bucket not found. Available buckets:', buckets?.map(b => `${b.id} (${b.name})`));
+    // Check if any buckets exist
+    if (!buckets || buckets.length === 0) {
+      console.error('No storage buckets found in the project');
       return { 
         success: false, 
-        error: new Error('Resumes bucket does not exist. File uploads will not work.')
+        error: new Error('No storage buckets found in the project. Please ensure buckets are created.')
       };
-    } else {
-      console.log('Resumes bucket exists and is accessible');
-      return { success: true };
     }
+    
+    // Check for the specific resume bucket
+    const resumesBucket = buckets.find(bucket => 
+      bucket.id === RESUME_BUCKET_ID || 
+      bucket.name === 'Resumes Storage'
+    );
+    
+    if (!resumesBucket) {
+      console.warn('Resumes bucket not found. Available buckets:', buckets.map(b => `${b.id} (${b.name})`));
+      return { 
+        success: false, 
+        error: new Error(`Resumes bucket "${RESUME_BUCKET_ID}" not found. Please check bucket configuration.`)
+      };
+    }
+    
+    console.log('Resumes bucket exists and is accessible:', resumesBucket);
+    
+    // Try to access the bucket directly to confirm permissions
+    try {
+      const { data, error } = await supabase.storage.from(RESUME_BUCKET_ID).list();
+      
+      if (error) {
+        console.warn('Could access bucket but not list contents:', error);
+        // We'll still return success since the bucket exists, but log the warning
+      } else {
+        console.log('Successfully listed bucket contents:', data);
+      }
+    } catch (listContentError) {
+      console.warn('Error listing bucket contents:', listContentError);
+      // Still continue if bucket exists but we can't list contents
+    }
+    
+    return { success: true, bucketInfo: resumesBucket };
   } catch (error) {
     console.error('Failed to check storage buckets:', error);
     return { success: false, error };
+  }
+};
+
+// Helper function to upload a file to the resumes bucket
+export const uploadResumeFile = async (file: File): Promise<{ url?: string; error?: Error }> => {
+  try {
+    // Check if the bucket is accessible first
+    const bucketCheck = await checkStorageBuckets();
+    if (!bucketCheck.success) {
+      return { error: bucketCheck.error };
+    }
+    
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+    const filePath = fileName;
+    
+    console.log(`Uploading file to ${RESUME_BUCKET_ID} bucket: ${filePath}`);
+    
+    const { error: uploadError, data: uploadData } = await supabase.storage
+      .from(RESUME_BUCKET_ID)
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (uploadError) {
+      console.error('Error uploading file to Supabase Storage:', uploadError);
+      return { error: new Error(`Failed to upload resume: ${uploadError.message}`) };
+    }
+
+    if (!uploadData || !uploadData.path) {
+      return { error: new Error('Upload failed - no data returned from server') };
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from(RESUME_BUCKET_ID)
+      .getPublicUrl(uploadData.path);
+
+    if (!publicUrlData || !publicUrlData.publicUrl) {
+      return { error: new Error('Failed to get resume URL') };
+    }
+
+    console.log('File uploaded successfully, URL obtained:', publicUrlData.publicUrl);
+    return { url: publicUrlData.publicUrl };
+  } catch (error) {
+    console.error('File upload error:', error);
+    return { error: error instanceof Error ? error : new Error('An unknown error occurred during file upload') };
   }
 };
