@@ -62,78 +62,57 @@ serve(async (req) => {
                   // For PDF, we need to extract text using OpenAI
                   console.log("Processing PDF file, sending to OpenAI for text extraction");
                   
-                  // We'll use OpenAI to extract text from the PDF
-                  const formData = new FormData();
-                  formData.append('file', await response.blob(), 'resume.pdf');
-                  formData.append('model', 'gpt-4o-mini');
-                  formData.append('purpose', 'assistants');
-                  
-                  const openAIResponse = await fetch('https://api.openai.com/v1/files', {
-                    method: 'POST',
-                    headers: {
-                      'Authorization': `Bearer ${openAIApiKey}`,
-                    },
-                    body: formData,
-                  });
-                  
-                  if (!openAIResponse.ok) {
-                    const errorText = await openAIResponse.text();
-                    console.error("Error uploading file to OpenAI:", errorText);
-                    throw new Error(`OpenAI file upload error: ${errorText}`);
+                  // FIXED: Properly format OpenAI API request for PDF text extraction
+                  try {
+                    // First, we'll directly send the PDF to OpenAI's chat completions API with vision capabilities
+                    const pdfBytes = await response.arrayBuffer();
+                    const pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(pdfBytes)));
+                    
+                    const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+                      method: 'POST',
+                      headers: {
+                        'Authorization': `Bearer ${openAIApiKey}`,
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({
+                        model: 'gpt-4o-mini',
+                        messages: [
+                          { 
+                            role: 'system', 
+                            content: 'You are an assistant that extracts and summarizes text from PDF resumes. Extract all relevant information including skills, education, experience, certifications, and contact details.' 
+                          },
+                          { 
+                            role: 'user', 
+                            content: [
+                              { 
+                                type: 'text', 
+                                text: 'Please extract all text content from this resume PDF. Include all information such as contact details, education, work history, skills, etc.' 
+                              },
+                              { 
+                                type: 'image_url', 
+                                image_url: {
+                                  url: `data:application/pdf;base64,${pdfBase64}`
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      }),
+                    });
+                    
+                    if (!openAIResponse.ok) {
+                      const errorText = await openAIResponse.text();
+                      console.error("Error extracting text with OpenAI:", errorText);
+                      throw new Error(`OpenAI extraction error: ${errorText}`);
+                    }
+                    
+                    const extractionData = await openAIResponse.json();
+                    resumeText = extractionData.choices[0].message.content;
+                    console.log("Successfully extracted text from PDF using OpenAI. First 100 chars:", resumeText.substring(0, 100));
+                  } catch (openAiError) {
+                    console.error("Error with OpenAI PDF extraction:", openAiError);
+                    resumeText = "Could not extract text from PDF file. " + openAiError.message;
                   }
-                  
-                  const fileData = await openAIResponse.json();
-                  console.log("File uploaded to OpenAI:", fileData.id);
-                  
-                  // Now use the file in a completion request
-                  const extractionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-                    method: 'POST',
-                    headers: {
-                      'Authorization': `Bearer ${openAIApiKey}`,
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                      model: 'gpt-4o-mini',
-                      messages: [
-                        { 
-                          role: 'system', 
-                          content: 'You are an assistant that extracts and summarizes text from PDF resumes. Extract all relevant information including skills, education, experience, certifications, and contact details.' 
-                        },
-                        { 
-                          role: 'user', 
-                          content: [
-                            { 
-                              type: 'text', 
-                              text: 'Please extract all text content from this resume PDF file. Include all information such as contact details, education, work history, skills, etc.' 
-                            },
-                            { 
-                              type: 'file_reference', 
-                              file_id: fileData.id 
-                            }
-                          ]
-                        }
-                      ]
-                    }),
-                  });
-                  
-                  if (!extractionResponse.ok) {
-                    const errorText = await extractionResponse.text();
-                    console.error("Error extracting text with OpenAI:", errorText);
-                    throw new Error(`OpenAI extraction error: ${errorText}`);
-                  }
-                  
-                  const extractionData = await extractionResponse.json();
-                  resumeText = extractionData.choices[0].message.content;
-                  
-                  // Clean up the file from OpenAI
-                  await fetch(`https://api.openai.com/v1/files/${fileData.id}`, {
-                    method: 'DELETE',
-                    headers: {
-                      'Authorization': `Bearer ${openAIApiKey}`,
-                    },
-                  });
-                  
-                  console.log("Successfully extracted text from PDF using OpenAI. First 100 chars:", resumeText.substring(0, 100));
                 } else if (contentType && (contentType.includes('text/plain') || contentType.includes('text/html'))) {
                   // For text files, we can just read the content
                   resumeText = await response.text();
@@ -262,23 +241,37 @@ serve(async (req) => {
         
         // Store the analysis result in the database if we have jobId and applicantId
         if (jobId && applicantId) {
-          const { error: upsertError } = await supabase
-            .from('application_analyses')
-            .upsert({
-              application_id: applicantId,
-              job_id: jobId,
-              education_level: analysisResult.educationLevel,
-              years_experience: analysisResult.yearsExperience,
-              skills_match: analysisResult.skillsMatch,
-              key_skills: analysisResult.keySkills,
-              missing_requirements: analysisResult.missingRequirements,
-              overall_score: analysisResult.overallScore,
-              analyzed_at: new Date().toISOString(),
-              fallback: false
-            });
-            
-          if (upsertError) {
-            console.error("Error storing analysis result:", upsertError);
+          try {
+            // FIXED: Use upsert with on_conflict to handle duplicate key issues
+            const { error: upsertError } = await supabase
+              .from('application_analyses')
+              .upsert(
+                {
+                  application_id: applicantId,
+                  job_id: jobId,
+                  education_level: analysisResult.educationLevel,
+                  years_experience: analysisResult.yearsExperience,
+                  skills_match: analysisResult.skillsMatch,
+                  key_skills: analysisResult.keySkills,
+                  missing_requirements: analysisResult.missingRequirements,
+                  overall_score: analysisResult.overallScore,
+                  analyzed_at: new Date().toISOString(),
+                  fallback: false
+                },
+                { 
+                  onConflict: 'application_id', 
+                  ignoreDuplicates: false 
+                }
+              );
+              
+            if (upsertError) {
+              console.error("Error storing analysis result:", upsertError);
+            } else {
+              console.log("Successfully stored analysis for application:", applicantId);
+            }
+          } catch (dbError) {
+            console.error("Error storing analysis in database:", dbError);
+            // Continue despite storage error - we'll return the analysis anyway
           }
         }
         
@@ -297,21 +290,29 @@ serve(async (req) => {
           try {
             const { error: upsertError } = await supabase
               .from('application_analyses')
-              .upsert({
-                application_id: applicantId,
-                job_id: jobId,
-                education_level: fallbackAnalysis.educationLevel,
-                years_experience: fallbackAnalysis.yearsExperience,
-                skills_match: fallbackAnalysis.skillsMatch,
-                key_skills: fallbackAnalysis.keySkills,
-                missing_requirements: fallbackAnalysis.missingRequirements,
-                overall_score: fallbackAnalysis.overallScore,
-                analyzed_at: new Date().toISOString(),
-                fallback: true
-              });
+              .upsert(
+                {
+                  application_id: applicantId,
+                  job_id: jobId,
+                  education_level: fallbackAnalysis.educationLevel,
+                  years_experience: fallbackAnalysis.yearsExperience,
+                  skills_match: fallbackAnalysis.skillsMatch,
+                  key_skills: fallbackAnalysis.keySkills,
+                  missing_requirements: fallbackAnalysis.missingRequirements,
+                  overall_score: fallbackAnalysis.overallScore,
+                  analyzed_at: new Date().toISOString(),
+                  fallback: true
+                },
+                { 
+                  onConflict: 'application_id', 
+                  ignoreDuplicates: false 
+                }
+              );
               
             if (upsertError) {
               console.error("Error storing fallback analysis:", upsertError);
+            } else {
+              console.log("Successfully stored fallback analysis for application:", applicantId);
             }
           } catch (dbError) {
             console.error("Error storing fallback analysis:", dbError);

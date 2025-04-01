@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 interface ResumeAnalysisParams {
@@ -39,6 +38,19 @@ export async function analyzeResume({
     const { data: { session } } = await supabase.auth.getSession();
     const supabaseKey = session?.access_token || await getSBPublicKey();
     
+    // First check if an analysis already exists for this application
+    if (jobId && applicantId) {
+      const existingAnalysis = await getExistingAnalysis(applicantId);
+      if (existingAnalysis) {
+        console.log('Found existing analysis for application', applicantId, existingAnalysis);
+        // If an analysis already exists and is not a fallback, return it
+        if (!existingAnalysis.fallback) {
+          return existingAnalysis;
+        }
+        // Otherwise continue to generate a new one
+      }
+    }
+    
     const response = await fetch(
       'https://rtuzdeaxmpikwuvplcbh.supabase.co/functions/v1/analyze-resume',
       {
@@ -65,65 +77,6 @@ export async function analyzeResume({
 
     const data = await response.json();
     console.log('Received analysis result:', data);
-    
-    // Store the analysis result in the database directly if jobId and applicantId are provided
-    if (jobId && applicantId) {
-      try {
-        // First check if an analysis already exists for this application
-        const { data: existingAnalysis } = await supabase
-          .from('application_analyses')
-          .select('id')
-          .eq('application_id', applicantId)
-          .single();
-        
-        if (existingAnalysis) {
-          // Update existing analysis
-          const { error: updateError } = await supabase
-            .from('application_analyses')
-            .update({
-              education_level: data.educationLevel || 'Not available',
-              years_experience: data.yearsExperience || 'Not available',
-              skills_match: data.skillsMatch || 'Low',
-              key_skills: data.keySkills || [],
-              missing_requirements: data.missingRequirements || [],
-              overall_score: data.overallScore || 0,
-              fallback: data.fallback || false,
-              analyzed_at: new Date().toISOString()
-            })
-            .eq('id', existingAnalysis.id);
-            
-          if (updateError) {
-            console.error('Error updating analysis:', updateError);
-          } else {
-            console.log('Updated existing analysis for application:', applicantId);
-          }
-        } else {
-          // Insert new analysis
-          const { error: insertError } = await supabase
-            .from('application_analyses')
-            .insert({
-              application_id: applicantId,
-              job_id: jobId,
-              education_level: data.educationLevel || 'Not available',
-              years_experience: data.yearsExperience || 'Not available',
-              skills_match: data.skillsMatch || 'Low',
-              key_skills: data.keySkills || [],
-              missing_requirements: data.missingRequirements || [],
-              overall_score: data.overallScore || 0,
-              fallback: data.fallback || false
-            });
-            
-          if (insertError) {
-            console.error('Error inserting analysis:', insertError);
-          } else {
-            console.log('Inserted new analysis for application:', applicantId);
-          }
-        }
-      } catch (error) {
-        console.error('Error storing analysis in database:', error);
-        // Continue despite storage error - we'll return the analysis anyway
-      }
-    }
 
     return {
       educationLevel: data.educationLevel || 'Not available',
