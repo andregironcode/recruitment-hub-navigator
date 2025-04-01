@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { 
   getAllJobs, 
@@ -18,12 +19,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Edit, Trash2, Filter } from "lucide-react";
+import { Plus, Edit, Trash2, Filter, Users } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import RichTextEditor from "./RichTextEditor";
+import JobApplicants from "./JobApplicants";
 
 // Make sure we use the same Job interface from JobList
 import { Job } from "@/components/jobs/JobList";
@@ -35,6 +37,8 @@ const JobsManager = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentJob, setCurrentJob] = useState<Job | null>(null);
   const [filter, setFilter] = useState("");
+  const [viewMode, setViewMode] = useState<"list" | "applicants">("list");
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const { toast } = useToast();
   
   // Form state
@@ -197,6 +201,16 @@ const JobsManager = () => {
     }
   };
 
+  const viewApplicants = (job: Job) => {
+    setSelectedJob(job);
+    setViewMode("applicants");
+  };
+
+  const backToJobsList = () => {
+    setViewMode("list");
+    setSelectedJob(null);
+  };
+
   const filteredJobs = filter 
     ? jobs.filter(job => 
         job.title.toLowerCase().includes(filter.toLowerCase()) ||
@@ -207,87 +221,108 @@ const JobsManager = () => {
   
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold">Job Listings</h2>
-        <div className="flex gap-2">
-          <div className="relative">
-            <Filter className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              placeholder="Filter jobs..."
-              className="pl-8 w-[200px]"
-            />
+      {viewMode === "list" ? (
+        <>
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold">Job Listings</h2>
+            <div className="flex gap-2">
+              <div className="relative">
+                <Filter className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                  placeholder="Filter jobs..."
+                  className="pl-8 w-[200px]"
+                />
+              </div>
+              <Button onClick={loadJobs} variant="outline" size="sm">
+                Refresh
+              </Button>
+              <Button onClick={openAddDialog} size="sm">
+                <Plus className="mr-2 h-4 w-4" /> Add Job
+              </Button>
+            </div>
           </div>
-          <Button onClick={loadJobs} variant="outline" size="sm">
-            Refresh
-          </Button>
-          <Button onClick={openAddDialog} size="sm">
-            <Plus className="mr-2 h-4 w-4" /> Add Job
-          </Button>
-        </div>
-      </div>
-      
-      {isLoading ? (
-        <div className="flex justify-center py-8">
-          <p>Loading jobs...</p>
-        </div>
-      ) : filteredJobs.length > 0 ? (
-        <div className="overflow-x-auto rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Job Title</TableHead>
-                <TableHead>Company</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Industry</TableHead>
-                <TableHead>Posted</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredJobs.map((job) => (
-                <TableRow key={job.id}>
-                  <TableCell>
-                    <div className="font-medium">{job.title}</div>
-                    {job.featured && <Badge variant="outline" className="mt-1">Featured</Badge>}
-                  </TableCell>
-                  <TableCell>{job.company}</TableCell>
-                  <TableCell>{job.location}</TableCell>
-                  <TableCell>{job.jobType}</TableCell>
-                  <TableCell>{job.industry}</TableCell>
-                  <TableCell>{job.postedDate}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={() => openEditDialog(job)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={() => handleDelete(job.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+          
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <p>Loading jobs...</p>
+            </div>
+          ) : filteredJobs.length > 0 ? (
+            <div className="overflow-x-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Job Title</TableHead>
+                    <TableHead>Company</TableHead>
+                    <TableHead>Location</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Industry</TableHead>
+                    <TableHead>Posted</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredJobs.map((job) => (
+                    <TableRow key={job.id}>
+                      <TableCell>
+                        <div className="font-medium">{job.title}</div>
+                        {job.featured && <Badge variant="outline" className="mt-1">Featured</Badge>}
+                      </TableCell>
+                      <TableCell>{job.company}</TableCell>
+                      <TableCell>{job.location}</TableCell>
+                      <TableCell>{job.jobType}</TableCell>
+                      <TableCell>{job.industry}</TableCell>
+                      <TableCell>{job.postedDate}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => viewApplicants(job)}
+                            title="View Applicants"
+                          >
+                            <Users className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => openEditDialog(job)}
+                            title="Edit Job"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleDelete(job.id)}
+                            title="Delete Job"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className="text-center py-10 border rounded-md">
+              <p className="text-muted-foreground">No jobs found.</p>
+              <Button onClick={openAddDialog} variant="outline" className="mt-4">
+                Add Your First Job
+              </Button>
+            </div>
+          )}
+        </>
       ) : (
-        <div className="text-center py-10 border rounded-md">
-          <p className="text-muted-foreground">No jobs found.</p>
-          <Button onClick={openAddDialog} variant="outline" className="mt-4">
-            Add Your First Job
-          </Button>
-        </div>
+        // Show applicants view when a job is selected
+        <JobApplicants 
+          jobId={selectedJob?.id || 0} 
+          jobTitle={selectedJob?.title || ""} 
+          onBack={backToJobsList}
+        />
       )}
       
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

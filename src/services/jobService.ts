@@ -284,6 +284,44 @@ export const getAllApplications = async () => {
 };
 
 /**
+ * Get applications by job ID
+ */
+export const getApplicationsByJobId = async (jobId: number) => {
+  console.log('Fetching applications for job ID:', jobId);
+  const { data, error } = await supabase
+    .from('applications')
+    .select('*')
+    .eq('job_id', jobId)
+    .order('date_applied', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching applications by job ID:', error);
+    throw new Error('Failed to fetch applications for this job');
+  }
+
+  console.log('Applications for job ID:', data);
+
+  // Ensure we have data before mapping
+  if (!data || data.length === 0) {
+    console.log('No applications found for this job ID');
+    return [];
+  }
+
+  return data.map(app => ({
+    id: app.id,
+    jobId: app.job_id,
+    jobTitle: app.job_title,
+    applicantName: app.applicant_name,
+    email: app.email,
+    phone: app.phone || '',
+    resumeUrl: app.resume_url || '',
+    coverLetter: app.cover_letter || '',
+    status: app.status || 'new',
+    dateApplied: app.date_applied ? new Date(app.date_applied).toLocaleDateString() : 'Unknown'
+  }));
+};
+
+/**
  * Update application status
  */
 export const updateApplicationStatus = async (id: number, status: string): Promise<void> => {
