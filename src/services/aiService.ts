@@ -91,6 +91,11 @@ export async function analyzeResume({
         title: 'Re-analyzing resume',
         description: 'Sending resume to AI for a fresh analysis...',
       });
+    } else {
+      toast({
+        title: 'Analyzing resume',
+        description: 'Processing resume against job requirements...',
+      });
     }
     
     // Check if URL ends with pdf to ensure we're passing the full URL to the edge function
@@ -142,6 +147,14 @@ export async function analyzeResume({
 
     const data = await response.json();
     console.log('Received analysis result:', data);
+
+    // Show success message
+    toast({
+      title: 'Analysis Complete',
+      description: data.fallback ? 
+        'Resume was analyzed but with limited results.' : 
+        'Resume successfully analyzed against job requirements.',
+    });
 
     // Validate and return the analysis data
     return {

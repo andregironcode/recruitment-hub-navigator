@@ -188,123 +188,62 @@ serve(async (req) => {
       let openaiResponse;
       
       if (isPdfFile && pdfBuffer) {
-        console.log("PDF detected, preparing for analysis with GPT-4 Vision");
+        console.log("PDF detected, preparing for analysis with standard text-based approach");
         
-        // Convert ArrayBuffer to base64 for sending in the request body
-        const uint8Array = new Uint8Array(pdfBuffer);
-        let binaryString = '';
-        uint8Array.forEach(byte => {
-            binaryString += String.fromCharCode(byte);
-        });
-        const base64Data = btoa(binaryString);
-        
-        // Prepare the user prompt that includes instructions to analyze the resume
-        const userPrompt = `Analyze how well the resume in the attached PDF matches the following job description:
-        
-        JOB DESCRIPTION:
-        ${jobDescription}
-        
-        Return ONLY a clean JSON object with these fields (no markdown, no explanations, just valid JSON):
-        {
-          "educationLevel": "The candidate's highest level of education (Bachelor's, Master's, PhD, etc., or 'Unknown' if not found)",
-          "yearsExperience": "Total relevant years of experience (a number, range, or 'Unknown' if not clearly stated)",
-          "skillsMatch": "Overall match level ('High', 'Medium', or 'Low')",
-          "keySkills": ["Array of specific skills from resume that match job requirements"],
-          "missingRequirements": ["Array of key requirements from job description not found in resume"],
-          "overallScore": "A score from 0-100 representing overall match percentage"
-        }`;
-        
-        // Send to OpenAI for analysis, using the PDF content as an attachment
-        openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { 
-                role: 'user', 
-                content: [
-                  { type: 'text', text: userPrompt },
-                  {
-                    type: 'image_url',
-                    image_url: {
-                      url: `data:application/pdf;base64,${base64Data}`,
-                      detail: 'high'
-                    }
-                  }
-                ]
-              }
-            ],
-            temperature: 0.1,
-          }),
-        });
-        
-        if (!openaiResponse.ok) {
-          const errorText = await openaiResponse.text();
-          console.error(`OpenAI API error: ${openaiResponse.status} - ${errorText}`);
-          throw new Error(`OpenAI API error: ${openaiResponse.statusText} (${openaiResponse.status})`);
-        }
-        
-        const openaiData = await openaiResponse.json();
-        
-        // Get the analysis text from the OpenAI response
-        const analysisText = openaiData.choices[0].message.content;
-        
-        console.log(`OpenAI response received, length: ${analysisText.length}`);
-        console.log(`Analysis text preview: ${analysisText.substring(0, 200)}`);
-        
-        // Try to parse the result as JSON
-        let analysis;
         try {
-          // Clean the response to ensure it's valid JSON
-          const cleanedText = analysisText.trim()
-            .replace(/```json/g, '')  // Remove markdown code blocks if present
-            .replace(/```/g, '')      // Remove closing code blocks
-            .trim();
-            
-          analysis = JSON.parse(cleanedText);
-          console.log("Successfully parsed analysis result as JSON");
+          // For PDF files, we'll extract text and use it directly instead of using vision
+          const textDecoder = new TextDecoder();
+          let pdfText = textDecoder.decode(pdfBuffer);
           
-          // Ensure all required fields exist
-          analysis.educationLevel = analysis.educationLevel || "Not available";
-          analysis.yearsExperience = analysis.yearsExperience || "Not available";
-          analysis.skillsMatch = analysis.skillsMatch || "Low";
-          analysis.keySkills = analysis.keySkills || [];
-          analysis.missingRequirements = analysis.missingRequirements || [];
-          analysis.overallScore = typeof analysis.overallScore === 'number' ? 
-            analysis.overallScore : 
-            (typeof analysis.overallScore === 'string' ? parseInt(analysis.overallScore, 10) || 0 : 0);
-          analysis.fallback = false;
-        } catch (parseError) {
-          console.error('Error parsing OpenAI response:', parseError);
-          console.log('Raw response that failed to parse:', analysisText);
+          // Limit text length to avoid token limits
+          if (pdfText.length > 100000) {
+            console.log(`PDF text is very long (${pdfText.length} chars), truncating to 100K chars`);
+            pdfText = pdfText.substring(0, 100000);
+          }
           
-          // Provide a fallback analysis if parsing fails
-          analysis = {
-            educationLevel: "Not available",
-            yearsExperience: "Not available",
-            skillsMatch: "Low",
-            keySkills: ["Failed to extract skills from resume"],
-            missingRequirements: ["Failed to analyze resume against job requirements"],
-            overallScore: 0,
-            fallback: true,
-            debugInfo: `Failed to parse OpenAI response. Response started with: ${analysisText.substring(0, 100)}`
-          };
+          console.log(`Extracted ${pdfText.length} characters of text from PDF`);
+          
+          // Prepare the user prompt
+          const userPrompt = `Analyze how well the following resume matches the job description:
+          
+          JOB DESCRIPTION:
+          ${jobDescription}
+          
+          RESUME:
+          ${pdfText}
+          
+          Return ONLY a clean JSON object with these fields (no markdown, no explanations, just valid JSON):
+          {
+            "educationLevel": "The candidate's highest level of education (Bachelor's, Master's, PhD, etc., or 'Unknown' if not found)",
+            "yearsExperience": "Total relevant years of experience (a number, range, or 'Unknown' if not clearly stated)",
+            "skillsMatch": "Overall match level ('High', 'Medium', or 'Low')",
+            "keySkills": ["Array of specific skills from resume that match job requirements"],
+            "missingRequirements": ["Array of key requirements from job description not found in resume"],
+            "overallScore": "A score from 0-100 representing overall match percentage"
+          }`;
+          
+          console.log("Sending text-based PDF content to OpenAI");
+          
+          // Send to OpenAI for analysis
+          openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt }
+              ],
+              temperature: 0.1,
+            }),
+          });
+        } catch (extractError) {
+          console.error('Error extracting text from PDF:', extractError);
+          throw new Error(`Failed to extract text from PDF: ${extractError.message}`);
         }
-        
-        // Store analysis in database if we have job and application IDs
-        if (jobId && applicantId) {
-          await storeAnalysisInDatabase(jobId, applicantId, analysis, forceUpdate);
-        }
-        
-        return new Response(
-          JSON.stringify(analysis),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
       } else {
         // For text-based resumes, use the regular chat completions API
         const userPrompt = `Analyze how well the following resume matches the job description:
@@ -343,70 +282,70 @@ serve(async (req) => {
             temperature: 0.1,  // Lower temperature for more consistent results
           }),
         });
-        
-        if (!openaiResponse.ok) {
-          const errorText = await openaiResponse.text();
-          console.error(`OpenAI API error: ${openaiResponse.status} - ${errorText}`);
-          throw new Error(`OpenAI API error: ${openaiResponse.statusText} (${openaiResponse.status})`);
-        }
-        
-        const openaiData = await openaiResponse.json();
-        
-        // Get the analysis text from the OpenAI response
-        const analysisText = openaiData.choices[0].message.content;
-        
-        console.log(`OpenAI response received, length: ${analysisText.length}`);
-        console.log(`Analysis text preview: ${analysisText.substring(0, 200)}`);
-        
-        // Try to parse the result as JSON
-        let analysis;
-        try {
-          // Clean the response to ensure it's valid JSON
-          const cleanedText = analysisText.trim()
-            .replace(/```json/g, '')  // Remove markdown code blocks if present
-            .replace(/```/g, '')      // Remove closing code blocks
-            .trim();
-            
-          analysis = JSON.parse(cleanedText);
-          console.log("Successfully parsed analysis result as JSON");
-          
-          // Ensure all required fields exist
-          analysis.educationLevel = analysis.educationLevel || "Not available";
-          analysis.yearsExperience = analysis.yearsExperience || "Not available";
-          analysis.skillsMatch = analysis.skillsMatch || "Low";
-          analysis.keySkills = analysis.keySkills || [];
-          analysis.missingRequirements = analysis.missingRequirements || [];
-          analysis.overallScore = typeof analysis.overallScore === 'number' ? 
-            analysis.overallScore : 
-            (typeof analysis.overallScore === 'string' ? parseInt(analysis.overallScore, 10) || 0 : 0);
-          analysis.fallback = false;
-        } catch (parseError) {
-          console.error('Error parsing OpenAI response:', parseError);
-          console.log('Raw response that failed to parse:', analysisText);
-          
-          // Provide a fallback analysis if parsing fails
-          analysis = {
-            educationLevel: "Not available",
-            yearsExperience: "Not available",
-            skillsMatch: "Low",
-            keySkills: ["Failed to extract skills from resume"],
-            missingRequirements: ["Failed to analyze resume against job requirements"],
-            overallScore: 0,
-            fallback: true,
-            debugInfo: `Failed to parse OpenAI response. Response started with: ${analysisText.substring(0, 100)}`
-          };
-        }
-        
-        // Store analysis in database if we have job and application IDs
-        if (jobId && applicantId) {
-          await storeAnalysisInDatabase(jobId, applicantId, analysis, forceUpdate);
-        }
-        
-        return new Response(
-          JSON.stringify(analysis),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
       }
+      
+      if (!openaiResponse.ok) {
+        const errorText = await openaiResponse.text();
+        console.error(`OpenAI API error: ${openaiResponse.status} - ${errorText}`);
+        throw new Error(`OpenAI API error: ${openaiResponse.statusText} (${openaiResponse.status})`);
+      }
+      
+      const openaiData = await openaiResponse.json();
+      
+      // Get the analysis text from the OpenAI response
+      const analysisText = openaiData.choices[0].message.content;
+      
+      console.log(`OpenAI response received, length: ${analysisText.length}`);
+      console.log(`Analysis text preview: ${analysisText.substring(0, 200)}`);
+      
+      // Try to parse the result as JSON
+      let analysis;
+      try {
+        // Clean the response to ensure it's valid JSON
+        const cleanedText = analysisText.trim()
+          .replace(/```json/g, '')  // Remove markdown code blocks if present
+          .replace(/```/g, '')      // Remove closing code blocks
+          .trim();
+          
+        analysis = JSON.parse(cleanedText);
+        console.log("Successfully parsed analysis result as JSON");
+        
+        // Ensure all required fields exist
+        analysis.educationLevel = analysis.educationLevel || "Not available";
+        analysis.yearsExperience = analysis.yearsExperience || "Not available";
+        analysis.skillsMatch = analysis.skillsMatch || "Low";
+        analysis.keySkills = analysis.keySkills || [];
+        analysis.missingRequirements = analysis.missingRequirements || [];
+        analysis.overallScore = typeof analysis.overallScore === 'number' ? 
+          analysis.overallScore : 
+          (typeof analysis.overallScore === 'string' ? parseInt(analysis.overallScore, 10) || 0 : 0);
+        analysis.fallback = false;
+      } catch (parseError) {
+        console.error('Error parsing OpenAI response:', parseError);
+        console.log('Raw response that failed to parse:', analysisText);
+        
+        // Provide a fallback analysis if parsing fails
+        analysis = {
+          educationLevel: "Not available",
+          yearsExperience: "Not available",
+          skillsMatch: "Low",
+          keySkills: ["Failed to extract skills from resume"],
+          missingRequirements: ["Failed to analyze resume against job requirements"],
+          overallScore: 0,
+          fallback: true,
+          debugInfo: `Failed to parse OpenAI response. Response started with: ${analysisText.substring(0, 100)}`
+        };
+      }
+      
+      // Store analysis in database if we have job and application IDs
+      if (jobId && applicantId) {
+        await storeAnalysisInDatabase(jobId, applicantId, analysis, forceUpdate);
+      }
+      
+      return new Response(
+        JSON.stringify(analysis),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     } catch (error) {
       console.error('Error in analysis process:', error);
       
