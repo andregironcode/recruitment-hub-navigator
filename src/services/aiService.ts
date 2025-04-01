@@ -102,11 +102,44 @@ export async function getExistingAnalysis(applicationId: number): Promise<Resume
       keySkills: data.key_skills || [],
       missingRequirements: data.missing_requirements || [],
       overallScore: data.overall_score || 0,
-      fallback: data.fallback
+      fallback: data.fallback || false
     };
   } catch (error) {
     console.error('Error in getExistingAnalysis:', error);
     return null;
+  }
+}
+
+export async function getJobApplicationsAnalyses(jobId: number): Promise<Record<number, ResumeAnalysis>> {
+  try {
+    const { data, error } = await supabase
+      .from('application_analyses')
+      .select('*')
+      .eq('job_id', jobId);
+
+    if (error) {
+      console.error('Error fetching analyses:', error);
+      return {};
+    }
+
+    const analysesMap: Record<number, ResumeAnalysis> = {};
+    
+    for (const analysis of data || []) {
+      analysesMap[analysis.application_id] = {
+        educationLevel: analysis.education_level || 'Not available',
+        yearsExperience: analysis.years_experience || 'Not available',
+        skillsMatch: analysis.skills_match || 'Low',
+        keySkills: analysis.key_skills || [],
+        missingRequirements: analysis.missing_requirements || [],
+        overallScore: analysis.overall_score || 0,
+        fallback: analysis.fallback || false
+      };
+    }
+
+    return analysesMap;
+  } catch (error) {
+    console.error('Error in getJobApplicationsAnalyses:', error);
+    return {};
   }
 }
 

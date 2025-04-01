@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { getApplicationsByJobId, updateApplicationStatus, getJobById, deleteApplication } from "@/services/jobService";
-import { getJobApplicationsAnalyses, analyzeResume, ResumeAnalysis } from "@/services/aiService";
+import { getJobApplicationsAnalyses, analyzeResume, ResumeAnalysis, getExistingAnalysis } from "@/services/aiService";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -163,12 +163,12 @@ const JobApplicants = ({ jobId, jobTitle, onBack }: JobApplicantsProps) => {
       
       for (const applicant of applicantsWithResumes) {
         try {
-          const analysis = await analyzeResume(
-            applicant.resumeUrl,
-            jobDescription,
-            jobId,
-            applicant.id
-          );
+          const analysis = await analyzeResume({
+            resumeUrl: applicant.resumeUrl,
+            jobDescription: jobDescription,
+            jobId: jobId,
+            applicantId: applicant.id
+          });
           
           const index = updatedApplicants.findIndex(a => a.id === applicant.id);
           if (index !== -1) {
