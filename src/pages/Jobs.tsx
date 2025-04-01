@@ -102,7 +102,7 @@ const Jobs = () => {
             </p>
           </div>
           
-          <JobSearch onSearch={handleSearch} />
+          <JobSearch onSearch={handleSearch} initialFilters={filters} />
           
           <div className="mt-8">
             <div className="mb-4 flex justify-between items-center">
@@ -114,6 +114,8 @@ const Jobs = () => {
                   {filters.industry && filters.industry !== 'all' 
                     ? `Filtered by ${filters.industry}` 
                     : 'Showing all industries'}
+                  {filters.jobType && filters.jobType !== 'all' && 
+                    ` | Job Type: ${filters.jobType}`}
                 </div>
               )}
             </div>

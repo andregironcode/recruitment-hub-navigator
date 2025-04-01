@@ -5,16 +5,43 @@ import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Briefcase, Clock, Building, Share, ArrowLeft } from 'lucide-react';
+import { 
+  MapPin, 
+  Briefcase, 
+  Clock, 
+  Building, 
+  Share, 
+  ArrowLeft,
+  Send
+} from 'lucide-react';
 import { getJobById } from '@/services/jobService';
 import { Job } from '@/components/jobs/JobList';
 import { useToast } from '@/hooks/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 const JobDetail = () => {
   const { id } = useParams<{ id: string }>();
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const [isApplyDialogOpen, setIsApplyDialogOpen] = useState(false);
+  const [applicationData, setApplicationData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    coverLetter: ''
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const fetchJob = async () => {
@@ -46,6 +73,47 @@ const JobDetail = () => {
 
     fetchJob();
   }, [id, toast]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setApplicationData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleApply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!job) return;
+    
+    setIsSubmitting(true);
+    
+    try {
+      // Here we would normally submit the application to the backend
+      // For now, we'll just simulate a successful submission
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      toast({
+        title: 'Application Submitted',
+        description: `Thank you for applying to ${job.title} at ${job.company}!`,
+      });
+      
+      setIsApplyDialogOpen(false);
+      setApplicationData({
+        name: '',
+        email: '',
+        phone: '',
+        coverLetter: ''
+      });
+    } catch (error) {
+      console.error('Error submitting application:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to submit your application. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -161,7 +229,10 @@ const JobDetail = () => {
                     </div>
                   </div>
                   
-                  <Button className="w-full bg-recruitment-primary hover:bg-recruitment-primary/90 mb-3">
+                  <Button 
+                    className="w-full bg-recruitment-primary hover:bg-recruitment-primary/90 mb-3"
+                    onClick={() => setIsApplyDialogOpen(true)}
+                  >
                     Apply Now
                   </Button>
                   
@@ -174,6 +245,82 @@ const JobDetail = () => {
           </div>
         </div>
       </div>
+
+      {/* Job Application Dialog */}
+      <Dialog open={isApplyDialogOpen} onOpenChange={setIsApplyDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Apply for {job.title}</DialogTitle>
+            <DialogDescription>
+              Submit your application for this position at {job.company}.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <form onSubmit={handleApply} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Full Name *</Label>
+              <Input 
+                id="name" 
+                name="name" 
+                value={applicationData.name}
+                onChange={handleInputChange}
+                required
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="email">Email *</Label>
+              <Input 
+                id="email" 
+                name="email" 
+                type="email"
+                value={applicationData.email}
+                onChange={handleInputChange}
+                required
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone</Label>
+              <Input 
+                id="phone" 
+                name="phone"
+                value={applicationData.phone}
+                onChange={handleInputChange}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="coverLetter">Cover Letter</Label>
+              <Textarea 
+                id="coverLetter" 
+                name="coverLetter"
+                value={applicationData.coverLetter}
+                onChange={handleInputChange}
+                rows={5}
+                placeholder="Tell us why you're a good fit for this role..."
+              />
+            </div>
+            
+            <DialogFooter className="pt-4">
+              <Button 
+                variant="outline" 
+                type="button" 
+                onClick={() => setIsApplyDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                disabled={isSubmitting}
+                className="bg-recruitment-primary hover:bg-recruitment-primary/90"
+              >
+                {isSubmitting ? 'Submitting...' : <><Send className="mr-2 h-4 w-4" /> Submit Application</>}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 };

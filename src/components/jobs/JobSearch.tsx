@@ -14,6 +14,7 @@ import { getAllCategories } from '@/services/jobService';
 
 interface JobSearchProps {
   onSearch: (filters: JobSearchFilters) => void;
+  initialFilters?: JobSearchFilters;
 }
 
 export interface JobSearchFilters {
@@ -23,7 +24,7 @@ export interface JobSearchFilters {
   jobType: string;
 }
 
-const JobSearch: React.FC<JobSearchProps> = ({ onSearch }) => {
+const JobSearch: React.FC<JobSearchProps> = ({ onSearch, initialFilters }) => {
   const [filters, setFilters] = useState<JobSearchFilters>({
     keyword: '',
     location: '',
@@ -31,6 +32,13 @@ const JobSearch: React.FC<JobSearchProps> = ({ onSearch }) => {
     jobType: ''
   });
   const [industries, setIndustries] = useState<{id: number, name: string}[]>([]);
+  
+  useEffect(() => {
+    // Set initial filters if provided
+    if (initialFilters) {
+      setFilters(initialFilters);
+    }
+  }, [initialFilters]);
   
   useEffect(() => {
     const loadCategories = async () => {
