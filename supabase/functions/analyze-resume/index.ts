@@ -23,6 +23,7 @@ serve(async (req) => {
     const { resumeUrl, resumeContent, jobDescription, jobId, applicantId, forceUpdate } = await req.json();
     
     console.log(`Processing request with forceUpdate: ${forceUpdate}`);
+    console.log(`Request data: resumeUrl=${resumeUrl?.substring(0, 100) || 'none'}, contentLength=${resumeContent?.length || 0}`);
     
     // Check for existing analysis first if we have an application ID
     if (applicantId && !forceUpdate) {
@@ -77,26 +78,23 @@ serve(async (req) => {
           
           if (contentType?.includes('application/pdf')) {
             try {
-              const pdfArrayBuffer = await response.arrayBuffer();
-              const pdfBytes = new Uint8Array(pdfArrayBuffer);
+              console.log("Attempting to process PDF directly using Vision API");
               
-              // Convert the PDF to base64, limit size to 1MB to avoid API limits
-              const partialPdf = pdfBytes.slice(0, Math.min(pdfBytes.length, 1000000));
-              pdfBase64 = btoa(String.fromCharCode(...partialPdf));
+              // For PDFs, we'll just use their URL directly with the vision API
+              // instead of trying to extract text, which was causing errors
               useVisionAPI = true;
-              
-              // Also try to get text content as fallback
-              resumeText = "PDF content attached directly to analysis prompt";
-              console.log("PDF prepared for vision API analysis");
+              resumeText = "PDF content will be processed directly with Vision API";
             } catch (error) {
-              console.error('Error processing PDF:', error);
-              throw new Error(`Failed to process PDF: ${error.message}`);
+              console.error('Error in PDF handling approach:', error);
+              resumeText = `Error processing PDF: ${error.message}`;
             }
           } else if (contentType?.includes('text')) {
             // For text files, just get the content directly
             resumeText = await response.text();
+            console.log(`Successfully extracted text, length: ${resumeText.length}`);
           } else {
             resumeText = `Unsupported file type: ${contentType}. Please upload a PDF or text file.`;
+            console.log(resumeText);
           }
         } catch (error) {
           console.error('Error fetching resume from signed URL:', error);
@@ -115,13 +113,14 @@ serve(async (req) => {
       console.log(`Using provided resume content, length: ${resumeText.length}`);
     } else {
       resumeText = "No resume content or URL provided";
+      console.log(resumeText);
     }
     
-    console.log(`Resume text (preview): ${resumeText.substring(0, 100)}...`);
+    console.log(`Resume text preview (first 100 chars): ${resumeText.substring(0, 100)}`);
     
-    // If we have no meaningful text to analyze and no PDF, return a fallback analysis
+    // If we have no meaningful text to analyze and we're not using Vision API, return a fallback analysis
     if ((!resumeText || resumeText.includes('Error accessing resume file') || resumeText.length < 50) && !useVisionAPI) {
-      console.log('Insufficient resume text and no PDF, generating fallback analysis');
+      console.log('Insufficient resume text and not using Vision API, generating fallback analysis');
       
       const fallbackAnalysis = {
         educationLevel: "Unknown",
@@ -130,7 +129,8 @@ serve(async (req) => {
         keySkills: [],
         missingRequirements: [],
         overallScore: 0,
-        fallback: true
+        fallback: true,
+        debugInfo: `Failed to extract text from resume. Original URL: ${resumeUrl?.substring(0, 100)}`
       };
       
       // Store the fallback analysis if we have job and application IDs
@@ -176,12 +176,15 @@ serve(async (req) => {
     // Prepare the messages for OpenAI to analyze the resume against job description
     let messages = [];
     
-    if (useVisionAPI && pdfBase64) {
-      // Use vision API with PDF attachment for direct analysis
+    if (useVisionAPI && resumeUrl) {
+      // Use vision API with direct URL attachment
       messages = [
         { 
           role: 'system', 
-          content: `You are an AI recruitment assistant that analyzes resumes against job descriptions.`
+          content: `You are an AI recruitment assistant that analyzes resumes against job descriptions.
+          Analyze the resume PDF that will be attached to this message, comparing it against the job description.
+          Extract relevant education, experience, and skills.
+          Your task is to determine how well the candidate matches the requirements.`
         },
         { 
           role: 'user', 
@@ -193,7 +196,7 @@ serve(async (req) => {
               JOB DESCRIPTION:
               ${jobDescription}
               
-              Analyze the resume and return ONLY a JSON object with these fields:
+              Analyze the resume PDF and return ONLY a JSON object with these fields:
               1. educationLevel: The candidate's highest level of education mentioned (or "Unknown" if not found)
               2. yearsExperience: Total relevant years of experience (or "Unknown" if not clearly stated)
               3. skillsMatch: Overall match as "High", "Medium", or "Low"
@@ -206,28 +209,34 @@ serve(async (req) => {
             {
               type: 'image_url',
               image_url: {
-                url: `data:application/pdf;base64,${pdfBase64}`
+                url: resumeUrl
               }
             }
           ]
         }
       ];
       
-      console.log("Using vision API for resume analysis with attached PDF");
+      console.log("Using vision API for resume analysis with PDF URL");
     } else {
       // Use text-only approach
       messages = [
         { 
+          role: 'system',
+          content: `You are an AI recruitment assistant that analyzes resumes against job descriptions.
+          Extract relevant education, experience, and skills from the resume text.
+          Your task is to determine how well the candidate matches the job requirements.`
+        },
+        { 
           role: 'user', 
-          content: `You're an AI recruitment assistant tasked with analyzing resumes against job descriptions.
+          content: `Analyze how well this resume matches the following job description:
       
           JOB DESCRIPTION:
           ${jobDescription}
           
-          RESUME:
+          RESUME TEXT:
           ${resumeText}
           
-          Analyze how well this resume matches the job description and return ONLY a JSON object with these fields:
+          Return ONLY a JSON object with these fields:
           1. educationLevel: The candidate's highest level of education mentioned (or "Unknown" if not found)
           2. yearsExperience: Total relevant years of experience (or "Unknown" if not clearly stated)
           3. skillsMatch: Overall match as "High", "Medium", or "Low"
@@ -243,6 +252,8 @@ serve(async (req) => {
     }
     
     try {
+      console.log("Sending request to OpenAI");
+      
       // Send the prompt to OpenAI for analysis
       const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -258,19 +269,22 @@ serve(async (req) => {
       });
       
       if (!openaiResponse.ok) {
-        throw new Error(`OpenAI API error: ${openaiResponse.statusText}`);
+        const errorText = await openaiResponse.text();
+        console.error(`OpenAI API error: ${openaiResponse.status} - ${errorText}`);
+        throw new Error(`OpenAI API error: ${openaiResponse.statusText} (${openaiResponse.status})`);
       }
       
       const openaiData = await openaiResponse.json();
       const analysisText = openaiData.choices[0].message.content;
       
-      console.log(`Attempting to parse JSON: ${analysisText.substring(0, 100)}...`);
+      console.log(`OpenAI response received, length: ${analysisText.length}`);
+      console.log(`Analysis text preview: ${analysisText.substring(0, 200)}`);
       
       // Try to parse the result as JSON
       let analysis;
       try {
         analysis = JSON.parse(analysisText.trim());
-        console.log("Successfully parsed analysis result");
+        console.log("Successfully parsed analysis result as JSON");
         
         // Ensure all required fields exist
         analysis.educationLevel = analysis.educationLevel || "Not available";
@@ -282,6 +296,7 @@ serve(async (req) => {
         analysis.fallback = false;
       } catch (parseError) {
         console.error('Error parsing OpenAI response:', parseError);
+        console.log('Raw response that failed to parse:', analysisText);
         
         // Provide a fallback analysis if parsing fails
         analysis = {
@@ -291,7 +306,8 @@ serve(async (req) => {
           keySkills: ["Failed to extract skills from resume"],
           missingRequirements: ["Failed to analyze resume against job requirements"],
           overallScore: 0,
-          fallback: true
+          fallback: true,
+          debugInfo: `Failed to parse OpenAI response. Response started with: ${analysisText.substring(0, 100)}`
         };
       }
       
@@ -348,7 +364,8 @@ serve(async (req) => {
           keySkills: [`Error analyzing resume: ${error.message}`],
           missingRequirements: [],
           overallScore: 0,
-          fallback: true
+          fallback: true,
+          debugInfo: `Analysis error: ${error.message}`
         }),
         {
           status: 500,
@@ -362,7 +379,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         error: `Server error: ${error.message}`,
-        fallback: true
+        fallback: true,
+        debugInfo: `Server error: ${error.message}`
       }),
       {
         status: 500,

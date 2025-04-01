@@ -18,6 +18,7 @@ export interface ResumeAnalysis {
   missingRequirements: string[];
   overallScore: number;
   fallback?: boolean;
+  debugInfo?: string; // Add debug info field to help troubleshoot issues
 }
 
 export async function analyzeResume({
@@ -30,7 +31,7 @@ export async function analyzeResume({
 }: ResumeAnalysisParams): Promise<ResumeAnalysis> {
   try {
     console.log('Analyzing resume with params:', { 
-      resumeUrl: resumeUrl?.substring(0, 50), 
+      resumeUrl: resumeUrl?.substring(0, 100), 
       contentProvided: !!resumeContent, 
       contentLength: resumeContent ? resumeContent.length : 0,
       jobId, 
@@ -69,7 +70,8 @@ export async function analyzeResume({
         keySkills: ['Unable to analyze resume - missing required parameters'],
         missingRequirements: ['Unable to analyze resume - missing required parameters'],
         overallScore: 0,
-        fallback: true
+        fallback: true,
+        debugInfo: 'Missing required parameters'
       };
     }
     
@@ -87,7 +89,7 @@ export async function analyzeResume({
           jobDescription,
           jobId,
           applicantId,
-          forceUpdate // Pass the forceUpdate parameter to the edge function
+          forceUpdate
         }),
       }
     );
@@ -95,7 +97,16 @@ export async function analyzeResume({
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Error analyzing resume:', errorText);
-      throw new Error(`Failed to analyze resume: ${errorText}`);
+      return {
+        educationLevel: 'Error',
+        yearsExperience: 'Error',
+        skillsMatch: 'Error',
+        keySkills: [`Error analyzing resume: ${errorText}`],
+        missingRequirements: [],
+        overallScore: 0,
+        fallback: true,
+        debugInfo: `HTTP Error ${response.status}: ${errorText}`
+      };
     }
 
     const data = await response.json();
@@ -108,7 +119,8 @@ export async function analyzeResume({
       keySkills: data.keySkills || [],
       missingRequirements: data.missingRequirements || [],
       overallScore: data.overallScore || 0,
-      fallback: data.fallback
+      fallback: data.fallback,
+      debugInfo: data.debugInfo || data.error || null
     };
   } catch (error) {
     console.error('Error in analyzeResume function:', error);
@@ -117,10 +129,11 @@ export async function analyzeResume({
       educationLevel: 'Not available',
       yearsExperience: 'Not available',
       skillsMatch: 'Low',
-      keySkills: ['Unable to analyze resume'],
-      missingRequirements: ['Unable to analyze resume'],
+      keySkills: ['Unable to analyze resume due to error'],
+      missingRequirements: ['Unable to analyze resume due to error'],
       overallScore: 0,
-      fallback: true
+      fallback: true,
+      debugInfo: error instanceof Error ? error.message : 'Unknown error'
     };
   }
 }

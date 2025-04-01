@@ -57,6 +57,7 @@ const JobApplicants = ({ jobId, jobTitle, onBack }: JobApplicantsProps) => {
   const [jobDescription, setJobDescription] = useState("");
   const [groupBy, setGroupBy] = useState<GroupBy>("none");
   const [apiError, setApiError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -147,6 +148,7 @@ const JobApplicants = ({ jobId, jobTitle, onBack }: JobApplicantsProps) => {
     }
 
     setApiError(null);
+    setDebugInfo(null);
     setAiLoading(true);
     toast({
       title: "AI Screening",
@@ -173,6 +175,10 @@ const JobApplicants = ({ jobId, jobTitle, onBack }: JobApplicantsProps) => {
           });
           
           console.log(`Analysis received for ${applicant.applicantName}:`, analysis);
+          
+          if (analysis.debugInfo && !debugInfo) {
+            setDebugInfo(analysis.debugInfo);
+          }
           
           const index = updatedApplicants.findIndex(a => a.id === applicant.id);
           if (index !== -1) {
@@ -425,6 +431,11 @@ const JobApplicants = ({ jobId, jobTitle, onBack }: JobApplicantsProps) => {
           <AlertTitle>API Error</AlertTitle>
           <AlertDescription>
             {apiError}
+            {debugInfo && (
+              <div className="mt-2 p-2 bg-gray-800 text-white rounded text-xs font-mono overflow-auto max-h-32">
+                <p>Debug info: {debugInfo}</p>
+              </div>
+            )}
           </AlertDescription>
         </Alert>
       )}
