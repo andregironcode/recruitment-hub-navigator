@@ -44,13 +44,37 @@ export const checkStorageBuckets = async () => {
     
     console.log('Available buckets:', buckets);
     
-    // Check if any buckets exist
-    if (!buckets || buckets.length === 0) {
-      console.error('No storage buckets found in the project');
-      return { 
-        success: false, 
-        error: new Error('No storage buckets found in the project. Please ensure buckets are created.')
-      };
+    // Try to create the bucket if it doesn't exist
+    if (!buckets || buckets.length === 0 || !buckets.some(b => b.id === RESUME_BUCKET_ID)) {
+      console.log('Resumes bucket not found. Attempting to create it...');
+      try {
+        const { data: newBucket, error: createError } = await supabase.storage.createBucket(RESUME_BUCKET_ID, {
+          public: false,
+          fileSizeLimit: 10485760, // 10MB
+          allowedMimeTypes: [
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          ]
+        });
+        
+        if (createError) {
+          console.error('Failed to create bucket:', createError);
+          return { 
+            success: false, 
+            error: new Error(`Failed to create resume bucket: ${createError.message}`)
+          };
+        }
+        
+        console.log('Successfully created bucket:', newBucket);
+        return { success: true, bucketInfo: newBucket };
+      } catch (createErr) {
+        console.error('Exception when creating bucket:', createErr);
+        return { 
+          success: false, 
+          error: createErr instanceof Error ? createErr : new Error('Unknown error creating bucket')
+        };
+      }
     }
     
     // Check for the specific resume bucket
@@ -60,7 +84,7 @@ export const checkStorageBuckets = async () => {
     );
     
     if (!resumesBucket) {
-      console.warn('Resumes bucket not found. Available buckets:', buckets.map(b => `${b.id} (${b.name})`));
+      console.warn('Resumes bucket not found after check. Available buckets:', buckets.map(b => `${b.id} (${b.name})`));
       return { 
         success: false, 
         error: new Error(`Resumes bucket "${RESUME_BUCKET_ID}" not found. Please check bucket configuration.`)
