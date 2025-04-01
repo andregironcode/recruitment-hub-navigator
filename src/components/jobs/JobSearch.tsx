@@ -20,6 +20,7 @@ export interface JobSearchFilters {
   location: string;
   industry: string;
   jobType: string;
+  category?: string; // Adding the category property
 }
 
 const JobSearch: React.FC<JobSearchProps> = ({ onSearch }) => {

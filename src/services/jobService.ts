@@ -325,8 +325,9 @@ export const addCategory = (category: Omit<any, 'id' | 'jobCount'>): Promise<any
     setTimeout(() => {
       const newId = Math.max(...categoriesData.map(cat => cat.id), 0) + 1;
       const newCategory = { 
-        ...category, 
-        id: newId, 
+        id: newId,
+        name: category.name,
+        description: category.description,
         jobCount: 0 
       };
       categoriesData.push(newCategory);
