@@ -1013,3 +1013,492 @@ const Admin = () => {
               onChange={(e) => handleInputChange('description', e.target.value)}
             />
           </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenDialog(false)}>Cancel</Button>
+            <Button 
+              className="bg-recruitment-primary hover:bg-recruitment-primary/90"
+              onClick={editingJob ? handleUpdateJob : handleAddJob}
+            >
+              {editingJob ? 'Update Job' : 'Add Job'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Add Category Dialog */}
+      <Dialog open={openCategoryDialog} onOpenChange={setOpenCategoryDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Category</DialogTitle>
+            <DialogDescription>
+              Create a new job category to help organize your listings.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div>
+              <label htmlFor="categoryName" className="block text-sm font-medium text-gray-700 mb-1">
+                Category Name *
+              </label>
+              <Input
+                id="categoryName"
+                placeholder="e.g. Engineering"
+                value={category.name}
+                onChange={(e) => handleCategoryInputChange('name', e.target.value)}
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="categoryDescription" className="block text-sm font-medium text-gray-700 mb-1">
+                Description *
+              </label>
+              <Textarea
+                id="categoryDescription"
+                placeholder="Enter category description..."
+                value={category.description}
+                onChange={(e) => handleCategoryInputChange('description', e.target.value)}
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenCategoryDialog(false)}>Cancel</Button>
+            <Button 
+              className="bg-recruitment-primary hover:bg-recruitment-primary/90"
+              onClick={handleAddCategory}
+            >
+              Add Category
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Job Filter Dialog */}
+      <Dialog open={jobFiltersOpen} onOpenChange={setJobFiltersOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Filter Jobs</DialogTitle>
+            <DialogDescription>
+              Apply filters to find specific job listings.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Form {...jobFiltersForm}>
+            <form onSubmit={jobFiltersForm.handleSubmit(filterJobs)} className="space-y-4 py-4">
+              <FormField
+                control={jobFiltersForm.control}
+                name="searchTerm"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Search</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+                        <Input
+                          type="search"
+                          placeholder="Search jobs..."
+                          className="pl-9"
+                          {...field}
+                        />
+                      </div>
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField
+                  control={jobFiltersForm.control}
+                  name="jobType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Job Type</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Any type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="">Any type</SelectItem>
+                          <SelectItem value="Full-Time">Full-Time</SelectItem>
+                          <SelectItem value="Part-Time">Part-Time</SelectItem>
+                          <SelectItem value="Contract">Contract</SelectItem>
+                          <SelectItem value="Temporary">Temporary</SelectItem>
+                          <SelectItem value="Remote">Remote</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={jobFiltersForm.control}
+                  name="industry"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Industry</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Any industry" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="">Any industry</SelectItem>
+                          <SelectItem value="Technology">Technology</SelectItem>
+                          <SelectItem value="Finance">Finance</SelectItem>
+                          <SelectItem value="Healthcare">Healthcare</SelectItem>
+                          <SelectItem value="Marketing">Marketing</SelectItem>
+                          <SelectItem value="Engineering">Engineering</SelectItem>
+                          <SelectItem value="Retail">Retail</SelectItem>
+                          <SelectItem value="Human Resources">Human Resources</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField
+                  control={jobFiltersForm.control}
+                  name="featured"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Featured</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Any" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="">Any</SelectItem>
+                          <SelectItem value="true">Featured</SelectItem>
+                          <SelectItem value="false">Not Featured</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={jobFiltersForm.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Any category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="">Any category</SelectItem>
+                          {categories.map(cat => (
+                            <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={resetJobFilters}>
+                  Reset
+                </Button>
+                <Button type="submit" className="bg-recruitment-primary hover:bg-recruitment-primary/90">
+                  Apply Filters
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Application Filter Dialog */}
+      <Dialog open={applicationFiltersOpen} onOpenChange={setApplicationFiltersOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Filter Applications</DialogTitle>
+            <DialogDescription>
+              Apply filters to find specific job applications.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Form {...applicationFiltersForm}>
+            <form onSubmit={applicationFiltersForm.handleSubmit(filterApplications)} className="space-y-4 py-4">
+              <FormField
+                control={applicationFiltersForm.control}
+                name="searchTerm"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Search</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+                        <Input
+                          type="search"
+                          placeholder="Search applicants or jobs..."
+                          className="pl-9"
+                          {...field}
+                        />
+                      </div>
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={applicationFiltersForm.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Any status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="">Any status</SelectItem>
+                        <SelectItem value="new">New</SelectItem>
+                        <SelectItem value="reviewed">Reviewed</SelectItem>
+                        <SelectItem value="interviewing">Interviewing</SelectItem>
+                        <SelectItem value="rejected">Rejected</SelectItem>
+                        <SelectItem value="offered">Offered</SelectItem>
+                        <SelectItem value="hired">Hired</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )}
+              />
+              
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={resetApplicationFilters}>
+                  Reset
+                </Button>
+                <Button type="submit" className="bg-recruitment-primary hover:bg-recruitment-primary/90">
+                  Apply Filters
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Delete Job Confirmation */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Delete</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this job? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDeleteJob}>
+              Delete Job
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Delete Category Confirmation */}
+      <Dialog open={deleteCategoryConfirmOpen} onOpenChange={setDeleteCategoryConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Delete</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this category? This will not delete jobs in this category.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteCategoryConfirmOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDeleteCategory}>
+              Delete Category
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* View Application Dialog */}
+      <Dialog open={applicationViewOpen} onOpenChange={setApplicationViewOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              Application Details
+            </DialogTitle>
+            <DialogDescription>
+              {selectedApplication?.jobTitle}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedApplication && (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Applicant Information</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500">Name</label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <User className="h-4 w-4 text-gray-400" />
+                        <span>{selectedApplication.applicantName}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500">Email</label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Mail className="h-4 w-4 text-gray-400" />
+                        <a href={`mailto:${selectedApplication.email}`} className="text-blue-600 hover:underline">
+                          {selectedApplication.email}
+                        </a>
+                      </div>
+                    </div>
+                    {selectedApplication.phone && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-500">Phone</label>
+                        <div className="mt-1">
+                          {selectedApplication.phone}
+                        </div>
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500">Date Applied</label>
+                      <div className="mt-1">
+                        {selectedApplication.dateApplied}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Status</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-2">Current Status</label>
+                      <div>
+                        <span className={`px-2 py-1 rounded-full text-xs text-white ${getStatusBadgeColor(selectedApplication.status)}`}>
+                          {selectedApplication.status.charAt(0).toUpperCase() + selectedApplication.status.slice(1)}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-2">Change Status</label>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className={selectedApplication.status === 'new' ? 'bg-blue-100' : ''}
+                          onClick={() => handleUpdateApplicationStatus(selectedApplication.id, 'new')}
+                        >
+                          New
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className={selectedApplication.status === 'reviewed' ? 'bg-purple-100' : ''}
+                          onClick={() => handleUpdateApplicationStatus(selectedApplication.id, 'reviewed')}
+                        >
+                          Reviewed
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className={selectedApplication.status === 'interviewing' ? 'bg-amber-100' : ''}
+                          onClick={() => handleUpdateApplicationStatus(selectedApplication.id, 'interviewing')}
+                        >
+                          Interviewing
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className={selectedApplication.status === 'rejected' ? 'bg-red-100' : ''}
+                          onClick={() => handleUpdateApplicationStatus(selectedApplication.id, 'rejected')}
+                        >
+                          Rejected
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className={selectedApplication.status === 'offered' ? 'bg-green-100' : ''}
+                          onClick={() => handleUpdateApplicationStatus(selectedApplication.id, 'offered')}
+                        >
+                          Offered
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className={selectedApplication.status === 'hired' ? 'bg-teal-100' : ''}
+                          onClick={() => handleUpdateApplicationStatus(selectedApplication.id, 'hired')}
+                        >
+                          Hired
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {selectedApplication.resumeUrl && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold mb-2">Résumé</h3>
+                  <div className="flex items-center">
+                    <a 
+                      href={selectedApplication.resumeUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline flex items-center gap-2"
+                    >
+                      <FileText className="h-4 w-4" />
+                      View Résumé
+                    </a>
+                  </div>
+                </div>
+              )}
+              
+              {selectedApplication.coverLetter && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Cover Letter</h3>
+                  <div className="bg-gray-50 p-4 rounded border">
+                    <p className="whitespace-pre-line">{selectedApplication.coverLetter}</p>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setApplicationViewOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Layout>
+  );
+};
+
+export default Admin;
