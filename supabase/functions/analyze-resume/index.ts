@@ -18,7 +18,7 @@ serve(async (req) => {
   }
 
   try {
-    const { resumeUrl, jobDescription, jobId, applicantId } = await req.json();
+    const { resumeUrl, resumeContent, jobDescription, jobId, applicantId } = await req.json();
     
     if (!jobDescription) {
       return new Response(
@@ -39,7 +39,9 @@ serve(async (req) => {
       // Extract text from the resume
       let resumeText = "Could not extract resume text.";
       
-      if (resumeUrl) {
+      if (resumeContent) {
+        resumeText = resumeContent;
+      } else if (resumeUrl) {
         try {
           // Check if it's a Supabase Storage URL or an external URL
           if (resumeUrl.includes('supabase.co') || resumeUrl.includes('supabase.in')) {
@@ -72,8 +74,8 @@ serve(async (req) => {
             }
           } else if (resumeUrl.startsWith('blob:')) {
             // If it's a blob URL, we can't directly access it.
-            // In a production system, you would need to have the client upload the file
-            resumeText = "This resume was submitted as a temporary blob URL. In a production system, please upload files to permanent storage.";
+            resumeText = "This resume was submitted as a temporary blob URL which cannot be processed server-side. For production use, implement client-side extraction or permanent storage.";
+            console.log("Blob URL detected, cannot process directly:", resumeUrl);
           } else {
             // Try to fetch the content if it's an accessible URL
             try {
@@ -96,6 +98,8 @@ serve(async (req) => {
         }
       }
 
+      console.log("Resume text (preview):", resumeText.substring(0, 100) + "...");
+
       const prompt = `
       You are an expert HR AI assistant that analyzes job applications.
       
@@ -112,7 +116,7 @@ serve(async (req) => {
       5. Important requirements from the job description that appear to be missing from the resume
       6. An overall match score from 0-100
       
-      Return ONLY valid JSON with these fields:
+      Return JSON with these fields:
       {
         "educationLevel": string (e.g., "High School", "Bachelor's Degree", "Master's Degree", "PhD", "Associate's Degree"),
         "yearsExperience": string (e.g., "<1", "1-3", "3-5", "5+", "7+", "10+"),
@@ -121,6 +125,7 @@ serve(async (req) => {
         "missingRequirements": string[] (list up to 3 potential missing requirements based on the job description),
         "overallScore": number (a realistic score between 0-100)
       }
+      Do not format with markdown or code blocks.
       `;
 
       try {
@@ -159,7 +164,17 @@ serve(async (req) => {
         
         let analysisResult;
         try {
-          analysisResult = JSON.parse(resultContent);
+          // Clean up any non-JSON formatting that may be in the response
+          const cleanedContent = resultContent.trim();
+          
+          // Try to find JSON object within text if it's not pure JSON
+          const jsonMatch = cleanedContent.match(/(\{[\s\S]*\})/);
+          const jsonStr = jsonMatch ? jsonMatch[0] : cleanedContent;
+          
+          console.log("Attempting to parse JSON:", jsonStr.substring(0, 100) + "...");
+          analysisResult = JSON.parse(jsonStr);
+          
+          console.log("Successfully parsed analysis result");
         } catch (parseError) {
           console.error("Error parsing OpenAI response:", parseError, "Response was:", resultContent);
           throw new Error("Failed to parse AI analysis response");
@@ -178,7 +193,8 @@ serve(async (req) => {
               key_skills: analysisResult.keySkills,
               missing_requirements: analysisResult.missingRequirements,
               overall_score: analysisResult.overallScore,
-              analyzed_at: new Date().toISOString()
+              analyzed_at: new Date().toISOString(),
+              fallback: false
             });
             
           if (upsertError) {
@@ -210,7 +226,8 @@ serve(async (req) => {
                 key_skills: fallbackAnalysis.keySkills,
                 missing_requirements: fallbackAnalysis.missingRequirements,
                 overall_score: fallbackAnalysis.overallScore,
-                analyzed_at: new Date().toISOString()
+                analyzed_at: new Date().toISOString(),
+                fallback: true
               });
               
             if (upsertError) {
@@ -235,7 +252,7 @@ serve(async (req) => {
       console.error("AI analysis error:", aiError);
       
       // Generate a fallback analysis
-      const fallbackAnalysis = generateFallbackAnalysis(jobDescription, "");
+      const fallbackAnalysis = generateFallbackAnalysis(jobDescription, resumeText || "");
       
       return new Response(
         JSON.stringify({

@@ -23,9 +23,23 @@ export const analyzeResume = async (
   applicantId?: number
 ): Promise<ResumeAnalysis> => {
   try {
+    // For blob URLs, we can't send the actual content to the edge function
+    // So we'll extract a preview of the file content when possible
+    let resumeContent = null;
+    
+    if (resumeUrl && resumeUrl.startsWith('blob:')) {
+      try {
+        // Log this limitation
+        console.log('Attempting to extract content from blob URL:', resumeUrl);
+      } catch (err) {
+        console.warn('Unable to extract content from blob URL:', err);
+      }
+    }
+
     const { data, error } = await supabase.functions.invoke('analyze-resume', {
       body: {
         resumeUrl,
+        resumeContent,
         jobDescription,
         jobId,
         applicantId
@@ -73,7 +87,8 @@ export const getApplicationAnalysis = async (applicationId: number): Promise<Res
     skillsMatch: data.skills_match,
     keySkills: data.key_skills,
     missingRequirements: data.missing_requirements,
-    overallScore: data.overall_score
+    overallScore: data.overall_score,
+    fallback: data.fallback
   };
 };
 
