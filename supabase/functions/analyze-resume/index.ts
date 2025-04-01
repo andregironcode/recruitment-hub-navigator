@@ -1,14 +1,17 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
-
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-const supabaseUrl = Deno.env.get('SUPABASE_URL');
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Create a Supabase client with the service role key
+const supabaseAdmin = createClient(
+  Deno.env.get('SUPABASE_URL') || '',
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+);
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -17,524 +20,334 @@ serve(async (req) => {
   }
 
   try {
-    const { resumeUrl, resumeContent, jobDescription, jobId, applicantId } = await req.json();
+    const { resumeUrl, resumeContent, jobDescription, jobId, applicantId, forceUpdate } = await req.json();
     
-    if (!jobDescription) {
-      return new Response(
-        JSON.stringify({ error: 'Job description is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Initialize Supabase client
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    console.log(`Processing request with forceUpdate: ${forceUpdate}`);
     
-    try {
-      if (!openAIApiKey) {
-        console.log("OpenAI API key is not configured");
-        throw new Error("OpenAI API key is not configured");
-      }
+    // Check for existing analysis first if we have an application ID
+    if (applicantId && !forceUpdate) {
+      const { data: existingAnalysis, error: queryError } = await supabaseAdmin
+        .from('application_analyses')
+        .select('*')
+        .eq('application_id', applicantId)
+        .single();
       
-      // Extract text from the resume
-      let resumeText = "Could not extract resume text.";
-      
-      if (resumeContent) {
-        console.log("Using provided resume content directly, length:", resumeContent.length);
-        resumeText = resumeContent;
-      } else if (resumeUrl) {
-        try {
-          console.log("Processing resume URL:", resumeUrl);
-          
-          // Check if it's a Supabase Storage URL (signed URL)
-          if (resumeUrl.includes('supabase.co') || resumeUrl.includes('supabase.in')) {
-            console.log("Detected Supabase signed URL");
-            
-            // Try to download the content directly
-            try {
-              const response = await fetch(resumeUrl);
-              if (response.ok) {
-                const contentType = response.headers.get('content-type');
-                console.log("File content type:", contentType);
-                
-                // Handle different file types
-                if (contentType && contentType.includes('application/pdf')) {
-                  // For PDF, we need to extract text using OpenAI
-                  console.log("Processing PDF file, sending to OpenAI for text extraction");
-                  
-                  // FIXED: Use the proper OpenAI API for PDF text extraction
-                  try {
-                    const pdfBytes = await response.arrayBuffer();
-                    const pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(pdfBytes)));
-                    
-                    const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-                      method: 'POST',
-                      headers: {
-                        'Authorization': `Bearer ${openAIApiKey}`,
-                        'Content-Type': 'application/json',
-                      },
-                      body: JSON.stringify({
-                        model: 'gpt-4o-mini',
-                        messages: [
-                          { 
-                            role: 'system', 
-                            content: 'You are an assistant that extracts and summarizes text from PDF resumes. Extract all relevant information including skills, education, experience, certifications, and contact details.' 
-                          },
-                          { 
-                            role: 'user', 
-                            content: [
-                              { 
-                                type: 'text', 
-                                text: 'Please extract all text content from this resume PDF. Include all information such as contact details, education, work history, skills, etc.' 
-                              },
-                              { 
-                                type: 'image_url', 
-                                image_url: {
-                                  url: `data:application/pdf;base64,${pdfBase64}`
-                                }
-                              }
-                            ]
-                          }
-                        ]
-                      }),
-                    });
-                    
-                    if (!openAIResponse.ok) {
-                      const errorText = await openAIResponse.text();
-                      console.error("Error extracting text with OpenAI:", errorText);
-                      throw new Error(`OpenAI extraction error: ${errorText}`);
-                    }
-                    
-                    const extractionData = await openAIResponse.json();
-                    resumeText = extractionData.choices[0].message.content;
-                    console.log("Successfully extracted text from PDF using OpenAI. First 100 chars:", resumeText.substring(0, 100));
-                  } catch (openAiError) {
-                    console.error("Error with OpenAI PDF extraction:", openAiError);
-                    resumeText = "Could not extract text from PDF file. " + openAiError.message;
-                  }
-                } else if (contentType && (contentType.includes('text/plain') || contentType.includes('text/html'))) {
-                  // For text files, we can just read the content
-                  resumeText = await response.text();
-                  console.log("Successfully extracted text from text file. First 100 chars:", resumeText.substring(0, 100));
-                } else {
-                  // For other file types, we'll just note the type
-                  resumeText = `Resume in format ${contentType} was submitted. File needs special processing.`;
-                  console.log("Unsupported file type:", contentType);
-                }
-              } else {
-                console.error("Error fetching file from URL:", response.status, response.statusText);
-                resumeText = "Could not download the resume file.";
-              }
-            } catch (fetchError) {
-              console.error("Error fetching resume from signed URL:", fetchError);
-              resumeText = "Error accessing resume file: " + fetchError.message;
-            }
-          } else if (resumeUrl.startsWith('blob:')) {
-            // If it's a blob URL, we can't directly access it.
-            resumeText = "This resume was submitted as a temporary blob URL which cannot be processed server-side. For production use, implement client-side extraction or permanent storage.";
-            console.log("Blob URL detected, cannot process directly:", resumeUrl);
-          } else {
-            // Try to fetch the content if it's an accessible URL
-            try {
-              const response = await fetch(resumeUrl);
-              if (response.ok) {
-                const contentType = response.headers.get('content-type');
-                if (contentType && contentType.includes('text')) {
-                  resumeText = await response.text();
-                } else {
-                  resumeText = "Retrieved non-text content that requires special processing.";
-                }
-              }
-            } catch (fetchError) {
-              console.error("Error fetching resume content:", fetchError);
-              resumeText = "Could not fetch resume content from URL.";
-            }
-          }
-        } catch (extractionError) {
-          console.error("Error extracting resume text:", extractionError);
-          resumeText = "Error during resume text extraction: " + extractionError.message;
-        }
-      }
-
-      console.log("Resume text (preview):", resumeText.substring(0, 100) + "...");
-
-      const prompt = `
-      You are an expert HR AI assistant that analyzes job applications.
-      
-      Job Description: ${jobDescription}
-      
-      Resume Content:
-      ${resumeText}
-      
-      Analyze the resume against the job description and provide:
-      1. The candidate's education level
-      2. Years of experience in relevant fields
-      3. How well the candidate's skills match the job requirements
-      4. Key skills found in the resume that are relevant to the job
-      5. Important requirements from the job description that appear to be missing from the resume
-      6. An overall match score from 0-100
-      
-      Return JSON with these fields:
-      {
-        "educationLevel": string (e.g., "High School", "Bachelor's Degree", "Master's Degree", "PhD", "Associate's Degree"),
-        "yearsExperience": string (e.g., "<1", "1-3", "3-5", "5+", "7+", "10+"),
-        "skillsMatch": string (choose from "Low", "Medium", "High"),
-        "keySkills": string[] (list up to 5 skills that are relevant based on the job description),
-        "missingRequirements": string[] (list up to 3 potential missing requirements based on the job description),
-        "overallScore": number (a realistic score between 0-100)
-      }
-      Do not format with markdown or code blocks.
-      `;
-
-      try {
-        // Try calling OpenAI API
-        const openAiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openAIApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            messages: [
-              { role: 'system', content: 'You are an expert HR assistant that analyzes job applications.' },
-              { role: 'user', content: prompt }
-            ],
-            temperature: 0.7,
-          }),
-        });
-
-        if (!openAiResponse.ok) {
-          const errorText = await openAiResponse.text();
-          console.error("OpenAI API error:", errorText);
-          throw new Error(`OpenAI API error: ${errorText}`);
-        }
-
-        const openAiData = await openAiResponse.json();
-        let resultContent = openAiData.choices[0].message.content;
+      if (!queryError && existingAnalysis) {
+        console.log(`Found existing analysis for application ${applicantId}, returning it`);
         
-        // Handle the case where GPT wraps the JSON in markdown code blocks
-        if (resultContent.includes('```json')) {
-          resultContent = resultContent.replace(/```json\n|\n```/g, '');
-        } else if (resultContent.includes('```')) {
-          resultContent = resultContent.replace(/```\n|\n```/g, '');
-        }
-        
-        let analysisResult;
-        try {
-          // Clean up any non-JSON formatting that may be in the response
-          const cleanedContent = resultContent.trim();
-          
-          // Try to find JSON object within text if it's not pure JSON
-          const jsonMatch = cleanedContent.match(/(\{[\s\S]*\})/);
-          const jsonStr = jsonMatch ? jsonMatch[0] : cleanedContent;
-          
-          console.log("Attempting to parse JSON:", jsonStr.substring(0, 100) + "...");
-          analysisResult = JSON.parse(jsonStr);
-          
-          console.log("Successfully parsed analysis result");
-        } catch (parseError) {
-          console.error("Error parsing OpenAI response:", parseError, "Response was:", resultContent);
-          throw new Error("Failed to parse AI analysis response");
-        }
-        
-        // Store the analysis result in the database if we have jobId and applicantId
-        if (jobId && applicantId) {
-          try {
-            // FIXED: Use upsert with on_conflict to handle duplicate key issues
-            const { error: upsertError } = await supabase
-              .from('application_analyses')
-              .upsert(
-                {
-                  application_id: applicantId,
-                  job_id: jobId,
-                  education_level: analysisResult.educationLevel,
-                  years_experience: analysisResult.yearsExperience,
-                  skills_match: analysisResult.skillsMatch,
-                  key_skills: analysisResult.keySkills,
-                  missing_requirements: analysisResult.missingRequirements,
-                  overall_score: analysisResult.overallScore,
-                  analyzed_at: new Date().toISOString(),
-                  fallback: false
-                },
-                { 
-                  onConflict: 'application_id', 
-                  ignoreDuplicates: false 
-                }
-              );
-              
-            if (upsertError) {
-              console.error("Error storing analysis result:", upsertError);
-            } else {
-              console.log("Successfully stored analysis for application:", applicantId);
-            }
-          } catch (dbError) {
-            console.error("Error storing analysis in database:", dbError);
-            // Continue despite storage error - we'll return the analysis anyway
-          }
-        }
-        
-        return new Response(
-          JSON.stringify(analysisResult),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      } catch (openAiError) {
-        console.error("OpenAI API call failed:", openAiError.message);
-        
-        // Generate a fallback analysis
-        const fallbackAnalysis = generateFallbackAnalysis(jobDescription, resumeText);
-        
-        // Store the fallback analysis if we have jobId and applicantId
-        if (jobId && applicantId) {
-          try {
-            const { error: upsertError } = await supabase
-              .from('application_analyses')
-              .upsert(
-                {
-                  application_id: applicantId,
-                  job_id: jobId,
-                  education_level: fallbackAnalysis.educationLevel,
-                  years_experience: fallbackAnalysis.yearsExperience,
-                  skills_match: fallbackAnalysis.skillsMatch,
-                  key_skills: fallbackAnalysis.keySkills,
-                  missing_requirements: fallbackAnalysis.missingRequirements,
-                  overall_score: fallbackAnalysis.overallScore,
-                  analyzed_at: new Date().toISOString(),
-                  fallback: true
-                },
-                { 
-                  onConflict: 'application_id', 
-                  ignoreDuplicates: false 
-                }
-              );
-              
-            if (upsertError) {
-              console.error("Error storing fallback analysis:", upsertError);
-            } else {
-              console.log("Successfully stored fallback analysis for application:", applicantId);
-            }
-          } catch (dbError) {
-            console.error("Error storing fallback analysis:", dbError);
-          }
-        }
-        
-        // Return the fallback analysis
+        // Return existing analysis with formatted response
         return new Response(
           JSON.stringify({
-            ...fallbackAnalysis,
-            _note: "Generated without OpenAI due to API limitations",
-            fallback: true
+            educationLevel: existingAnalysis.education_level,
+            yearsExperience: existingAnalysis.years_experience, 
+            skillsMatch: existingAnalysis.skills_match,
+            keySkills: existingAnalysis.key_skills,
+            missingRequirements: existingAnalysis.missing_requirements,
+            overallScore: existingAnalysis.overall_score,
+            fallback: existingAnalysis.fallback
           }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
         );
       }
-    } catch (aiError) {
-      console.error("AI analysis error:", aiError);
+    }
+    
+    let resumeText = '';
+    
+    // Extract text from resume if URL is provided
+    if (resumeUrl) {
+      console.log(`Processing resume URL: ${resumeUrl}`);
       
-      // Generate a fallback analysis
-      const fallbackAnalysis = generateFallbackAnalysis(jobDescription, resumeText || "");
+      // Check if it's a Supabase storage URL
+      if (resumeUrl.includes('supabase.co/storage/v1/object/public')) {
+        console.log('Detected Supabase signed URL');
+        
+        try {
+          const response = await fetch(resumeUrl);
+          
+          if (!response.ok) {
+            throw new Error(`Failed to fetch resume: ${response.statusText}`);
+          }
+          
+          const contentType = response.headers.get('content-type');
+          console.log(`File content type: ${contentType}`);
+          
+          if (contentType?.includes('application/pdf')) {
+              // FIXED: Use the proper OpenAI API for PDF text extraction
+              try {
+                const pdfBytes = await response.arrayBuffer();
+                const pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(pdfBytes)));
+                
+                // Use text extraction from PDF using OpenAI's API
+                const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    model: 'gpt-4o-mini',
+                    messages: [
+                      { 
+                        role: 'user', 
+                        content: [
+                          { 
+                            type: 'text', 
+                            text: 'Extract all text content from this PDF resume. Format it clearly maintaining the structure.' 
+                          },
+                          {
+                            type: 'image_url',
+                            image_url: {
+                              url: `data:application/pdf;base64,${pdfBase64}`
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }),
+                });
+                
+                if (!openaiResponse.ok) {
+                  const errorText = await openaiResponse.text();
+                  throw new Error(`OpenAI error: ${errorText}`);
+                }
+                
+                const openaiData = await openaiResponse.json();
+                resumeText = openaiData.choices[0].message.content;
+                console.log(`Successfully extracted text from PDF, length: ${resumeText.length}`);
+              } catch (error) {
+                console.error('Error processing PDF:', error);
+                throw new Error(`Failed to process PDF: ${error.message}`);
+              }
+          } else if (contentType?.includes('text')) {
+            // For text files, just get the content directly
+            resumeText = await response.text();
+          } else {
+            resumeText = `Unsupported file type: ${contentType}. Please upload a PDF or text file.`;
+          }
+        } catch (error) {
+          console.error('Error fetching resume from signed URL:', error);
+          resumeText = `Error accessing resume file: ${error.message}`;
+        }
+      } else if (resumeUrl.startsWith('blob:')) {
+        console.log(`Blob URL detected, cannot process directly: ${resumeUrl}`);
+        resumeText = "This resume was submitted as a temporary blob URL which cannot be processed server-side. For production use, ensure files are properly uploaded to storage first.";
+      } else {
+        console.log(`Unknown URL format: ${resumeUrl}`);
+        resumeText = "Unrecognized URL format. Please upload the resume to a proper storage service.";
+      }
+    } else if (resumeContent) {
+      // If content was provided directly, use that
+      resumeText = resumeContent;
+      console.log(`Using provided resume content, length: ${resumeText.length}`);
+    } else {
+      resumeText = "No resume content or URL provided";
+    }
+    
+    console.log(`Resume text (preview): ${resumeText.substring(0, 100)}...`);
+    
+    // If we have no meaningful text to analyze, return a fallback analysis
+    if (!resumeText || resumeText.includes('Error accessing resume file') || resumeText.length < 50) {
+      console.log('Insufficient resume text, generating fallback analysis');
+      
+      const fallbackAnalysis = {
+        educationLevel: "Unknown",
+        yearsExperience: "Unknown",
+        skillsMatch: "Unknown",
+        keySkills: [],
+        missingRequirements: [],
+        overallScore: 0,
+        fallback: true
+      };
+      
+      // Store the fallback analysis if we have job and application IDs
+      if (jobId && applicantId) {
+        try {
+          if (forceUpdate) {
+            // If forcing update, first delete existing analysis
+            await supabaseAdmin
+              .from('application_analyses')
+              .delete()
+              .eq('application_id', applicantId);
+          }
+          
+          // Then insert the new analysis
+          const { error } = await supabaseAdmin
+            .from('application_analyses')
+            .upsert({
+              application_id: applicantId,
+              job_id: jobId,
+              education_level: fallbackAnalysis.educationLevel,
+              years_experience: fallbackAnalysis.yearsExperience,
+              skills_match: fallbackAnalysis.skillsMatch,
+              key_skills: fallbackAnalysis.keySkills,
+              missing_requirements: fallbackAnalysis.missingRequirements,
+              overall_score: fallbackAnalysis.overallScore,
+              fallback: true
+            });
+            
+          if (error) {
+            console.error('Error storing fallback analysis:', error);
+          }
+        } catch (error) {
+          console.error('Error in database operation for fallback analysis:', error);
+        }
+      }
       
       return new Response(
-        JSON.stringify({
-          ...fallbackAnalysis,
-          _note: "Fallback analysis due to API error",
-          _error: aiError.message,
-          fallback: true
-        }),
+        JSON.stringify(fallbackAnalysis),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-  } catch (error) {
-    console.error("Error in analyze-resume function:", error);
     
-    // Return an error response
+    // Prepare prompt for OpenAI to analyze the resume against job description
+    const prompt = `
+    You're an AI recruitment assistant tasked with analyzing resumes against job descriptions.
+    
+    JOB DESCRIPTION:
+    ${jobDescription}
+    
+    RESUME:
+    ${resumeText}
+    
+    Analyze how well this resume matches the job description and return ONLY a JSON object with these fields:
+    1. educationLevel: The candidate's highest level of education mentioned (or "Unknown" if not found)
+    2. yearsExperience: Total relevant years of experience (or "Unknown" if not clearly stated)
+    3. skillsMatch: Overall match as "High", "Medium", or "Low"
+    4. keySkills: Array of key skills found in resume that match job requirements
+    5. missingRequirements: Array of key requirements from job description not found in resume
+    6. overallScore: A numeric score from 0-100 representing overall match percentage
+    
+    Return your analysis as clean, parseable JSON WITHOUT explanations, code blocks, or other text.
+    `;
+    
+    try {
+      // Send the prompt to OpenAI for analysis
+      const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.3,
+        }),
+      });
+      
+      if (!openaiResponse.ok) {
+        throw new Error(`OpenAI API error: ${openaiResponse.statusText}`);
+      }
+      
+      const openaiData = await openaiResponse.json();
+      const analysisText = openaiData.choices[0].message.content;
+      
+      console.log(`Attempting to parse JSON: ${analysisText.substring(0, 100)}...`);
+      
+      // Try to parse the result as JSON
+      let analysis;
+      try {
+        analysis = JSON.parse(analysisText.trim());
+        console.log("Successfully parsed analysis result");
+        
+        // Ensure all required fields exist
+        analysis.educationLevel = analysis.educationLevel || "Not available";
+        analysis.yearsExperience = analysis.yearsExperience || "Not available";
+        analysis.skillsMatch = analysis.skillsMatch || "Low";
+        analysis.keySkills = analysis.keySkills || [];
+        analysis.missingRequirements = analysis.missingRequirements || [];
+        analysis.overallScore = analysis.overallScore || 0;
+        analysis.fallback = false;
+      } catch (parseError) {
+        console.error('Error parsing OpenAI response:', parseError);
+        
+        // Provide a fallback analysis if parsing fails
+        analysis = {
+          educationLevel: "Not available",
+          yearsExperience: "Not available",
+          skillsMatch: "Low",
+          keySkills: ["Failed to extract skills from resume"],
+          missingRequirements: ["Failed to analyze resume against job requirements"],
+          overallScore: 0,
+          fallback: true
+        };
+      }
+      
+      // Store analysis in database if we have job and application IDs
+      if (jobId && applicantId) {
+        try {
+          if (forceUpdate) {
+            // If forcing update, first delete existing analysis
+            await supabaseAdmin
+              .from('application_analyses')
+              .delete()
+              .eq('application_id', applicantId);
+              
+            console.log(`Deleted existing analysis for application ${applicantId} as forceUpdate was requested`);
+          }
+          
+          // Use upsert to handle both insert and update cases
+          const { error } = await supabaseAdmin
+            .from('application_analyses')
+            .upsert({
+              application_id: applicantId,
+              job_id: jobId,
+              education_level: analysis.educationLevel,
+              years_experience: analysis.yearsExperience,
+              skills_match: analysis.skillsMatch,
+              key_skills: analysis.keySkills,
+              missing_requirements: analysis.missingRequirements,
+              overall_score: analysis.overallScore,
+              fallback: analysis.fallback
+            });
+            
+          if (error) {
+            console.error('Error storing analysis result:', error);
+          } else {
+            console.log(`Successfully stored/updated analysis for application ${applicantId}`);
+          }
+        } catch (dbError) {
+          console.error('Database error when storing analysis:', dbError);
+        }
+      }
+      
+      return new Response(
+        JSON.stringify(analysis),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } catch (error) {
+      console.error('Error in analysis process:', error);
+      
+      return new Response(
+        JSON.stringify({
+          educationLevel: "Error",
+          yearsExperience: "Error",
+          skillsMatch: "Error",
+          keySkills: [`Error analyzing resume: ${error.message}`],
+          missingRequirements: [],
+          overallScore: 0,
+          fallback: true
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+  } catch (error) {
+    console.error('Request processing error:', error);
+    
     return new Response(
       JSON.stringify({ 
-        error: "Function failed: " + error.message,
+        error: `Server error: ${error.message}`,
         fallback: true
       }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
     );
   }
 });
-
-// Fallback analysis generator that attempts to extract some info from resume text
-function generateFallbackAnalysis(jobDescription: string, resumeText: string) {
-  // Extract some keywords from job description and resume to use for "smart" fallback
-  const lowercaseDesc = jobDescription.toLowerCase();
-  const lowercaseResume = resumeText.toLowerCase();
-  
-  // Education level detection from resume
-  let educationLevel = "Bachelor's Degree"; // Default
-  if (lowercaseResume.includes("phd") || lowercaseResume.includes("doctorate") || lowercaseResume.includes("doctor of")) {
-    educationLevel = "PhD";
-  } else if (lowercaseResume.includes("master") || lowercaseResume.includes("mba") || lowercaseResume.includes("ms in") || lowercaseResume.includes("m.s")) {
-    educationLevel = "Master's Degree";
-  } else if (lowercaseResume.includes("high school") && !lowercaseResume.includes("bachelor") && !lowercaseResume.includes("college degree")) {
-    educationLevel = "High School";
-  } else if (lowercaseResume.includes("associate") || lowercaseResume.includes("a.a.") || lowercaseResume.includes("a.a")) {
-    educationLevel = "Associate's Degree";
-  }
-
-  // Fallback to job description requirements if resume doesn't contain education info
-  if (educationLevel === "Bachelor's Degree" && resumeText.length < 100) {
-    if (lowercaseDesc.includes("phd") || lowercaseDesc.includes("doctorate") || lowercaseDesc.includes("research")) {
-      educationLevel = "PhD";
-    } else if (lowercaseDesc.includes("master") || lowercaseDesc.includes("mba") || lowercaseDesc.includes("advanced degree")) {
-      educationLevel = "Master's Degree";
-    } else if (lowercaseDesc.includes("high school") || lowercaseDesc.includes("entry level")) {
-      educationLevel = "High School";
-    } else if (lowercaseDesc.includes("associate") || lowercaseDesc.includes("certificate")) {
-      educationLevel = "Associate's Degree";
-    }
-  }
-
-  // Experience level prediction from resume
-  let yearsExperience = "3-5"; // Default
-  
-  // Try to find years of experience mentions in the resume
-  const experiencePatterns = [
-    { pattern: /(\d+)\+?\s*years? of experience/i, handler: (match: string[]) => parseInt(match[1]) },
-    { pattern: /experience\D*(\d+)\+?\s*years?/i, handler: (match: string[]) => parseInt(match[1]) },
-    { pattern: /(\d+)\+?\s*years? in/i, handler: (match: string[]) => parseInt(match[1]) },
-    { pattern: /(\d{4})\s*-\s*present/i, handler: (match: string[]) => new Date().getFullYear() - parseInt(match[1]) },
-    { pattern: /(\d{4})\s*-\s*(\d{4})/gi, handler: (match: string[]) => {
-      // Get all year ranges and sum them up
-      let totalYears = 0;
-      let matches;
-      while ((matches = /(\d{4})\s*-\s*(\d{4})/gi.exec(resumeText)) !== null) {
-        const startYear = parseInt(matches[1]);
-        const endYear = parseInt(matches[2]);
-        if (endYear > startYear && endYear <= new Date().getFullYear()) {
-          totalYears += (endYear - startYear);
-        }
-      }
-      return totalYears;
-    }}
-  ];
-  
-  let foundYears = 0;
-  for (const { pattern, handler } of experiencePatterns) {
-    const match = lowercaseResume.match(pattern);
-    if (match) {
-      foundYears = handler(match);
-      break;
-    }
-  }
-  
-  if (foundYears > 0) {
-    if (foundYears < 1) yearsExperience = "<1";
-    else if (foundYears >= 1 && foundYears < 3) yearsExperience = "1-3";
-    else if (foundYears >= 3 && foundYears < 5) yearsExperience = "3-5";
-    else if (foundYears >= 5 && foundYears < 7) yearsExperience = "5+";
-    else if (foundYears >= 7 && foundYears < 10) yearsExperience = "7+";
-    else yearsExperience = "10+";
-  } else {
-    // Fallback to job title inference if no explicit years found
-    if (lowercaseResume.includes("senior") || lowercaseResume.includes("lead") || lowercaseResume.includes("manager")) {
-      yearsExperience = "5+";
-    } else if (lowercaseResume.includes("principal") || lowercaseResume.includes("director") || lowercaseResume.includes("head")) {
-      yearsExperience = "10+";
-    } else if (lowercaseResume.includes("junior") || lowercaseResume.includes("entry")) {
-      yearsExperience = "1-3";
-    } else if (lowercaseResume.includes("intern") || lowercaseResume.includes("trainee")) {
-      yearsExperience = "<1";
-    }
-  }
-
-  // Detect skills from job description and resume
-  const potentialSkills = [
-    { term: "javascript", skill: "JavaScript" },
-    { term: "react", skill: "React" },
-    { term: "node", skill: "Node.js" },
-    { term: "python", skill: "Python" },
-    { term: "java", skill: "Java" },
-    { term: "c#", skill: "C#" },
-    { term: "sql", skill: "SQL" },
-    { term: "nosql", skill: "NoSQL" },
-    { term: "mongodb", skill: "MongoDB" },
-    { term: "aws", skill: "AWS" },
-    { term: "azure", skill: "Azure" },
-    { term: "cloud", skill: "Cloud Computing" },
-    { term: "agile", skill: "Agile Methodology" },
-    { term: "scrum", skill: "Scrum" },
-    { term: "management", skill: "Project Management" },
-    { term: "customer", skill: "Customer Service" },
-    { term: "sales", skill: "Sales" },
-    { term: "marketing", skill: "Marketing" },
-    { term: "communication", skill: "Communication Skills" },
-    { term: "leadership", skill: "Leadership" },
-    { term: "teamwork", skill: "Teamwork" },
-    { term: "design", skill: "Design" },
-    { term: "ui", skill: "UI Design" },
-    { term: "ux", skill: "UX Design" },
-    { term: "analysis", skill: "Data Analysis" },
-    { term: "excel", skill: "Microsoft Excel" },
-    { term: "word", skill: "Microsoft Word" },
-    { term: "powerpoint", skill: "Microsoft PowerPoint" },
-    { term: "presentation", skill: "Presentation Skills" },
-    { term: "research", skill: "Research" }
-  ];
-  
-  // Find skills mentioned in the resume
-  const resumeSkills = potentialSkills
-    .filter(item => lowercaseResume.includes(item.term))
-    .map(item => item.skill);
-  
-  // Find skills mentioned in the job description
-  const jobSkills = potentialSkills
-    .filter(item => lowercaseDesc.includes(item.term))
-    .map(item => item.skill);
-  
-  // Matching skills (intersection of resume skills and job skills)
-  const matchingSkills = resumeSkills.filter(skill => jobSkills.includes(skill));
-  
-  // Key skills to highlight (prioritize matching skills, but include some resume skills if needed)
-  let keySkills = [...matchingSkills];
-  if (keySkills.length < 5) {
-    const additionalSkills = resumeSkills
-      .filter(skill => !keySkills.includes(skill))
-      .slice(0, 5 - keySkills.length);
-    keySkills = [...keySkills, ...additionalSkills];
-  }
-  
-  // If we still don't have enough skills, add some generic ones
-  if (keySkills.length < 3) {
-    const genericSkills = ["Communication", "Problem Solving", "Time Management", "Attention to Detail", "Teamwork"];
-    while (keySkills.length < 5) {
-      const skill = genericSkills[keySkills.length];
-      if (!keySkills.includes(skill)) {
-        keySkills.push(skill);
-      }
-    }
-  }
-  
-  // Limit to 5 skills
-  keySkills = keySkills.slice(0, 5);
-  
-  // Missing requirements - job skills not found in resume
-  const missingSkills = jobSkills
-    .filter(skill => !resumeSkills.includes(skill))
-    .slice(0, 3);
-  
-  // Calculate skills match percentage based on matching skills vs job skills
-  const matchPercentage = jobSkills.length > 0 
-    ? Math.round((matchingSkills.length / jobSkills.length) * 100)
-    : 70; // Default if no job skills detected
-  
-  // Adjust for resume quality/length
-  const overallScore = resumeText.length > 500
-    ? matchPercentage
-    : Math.max(30, Math.round(matchPercentage * 0.7)); // Penalize very short or empty resumes
-  
-  // Determine skill match level based on score
-  const skillsMatch = overallScore > 75 ? "High" : overallScore > 60 ? "Medium" : "Low";
-  
-  return {
-    educationLevel,
-    yearsExperience,
-    skillsMatch,
-    keySkills,
-    missingRequirements: missingSkills,
-    overallScore
-  };
-}

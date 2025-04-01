@@ -168,7 +168,8 @@ const JobApplicants = ({ jobId, jobTitle, onBack }: JobApplicantsProps) => {
             resumeUrl: applicant.resumeUrl,
             jobDescription: jobDescription,
             jobId: jobId,
-            applicantId: applicant.id
+            applicantId: applicant.id,
+            forceUpdate: true
           });
           
           console.log(`Analysis received for ${applicant.applicantName}:`, analysis);

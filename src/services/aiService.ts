@@ -7,6 +7,7 @@ interface ResumeAnalysisParams {
   jobDescription: string;
   jobId?: number;
   applicantId?: number;
+  forceUpdate?: boolean; // New parameter to force a new analysis
 }
 
 export interface ResumeAnalysis {
@@ -24,7 +25,8 @@ export async function analyzeResume({
   resumeContent,
   jobDescription,
   jobId,
-  applicantId
+  applicantId,
+  forceUpdate = false
 }: ResumeAnalysisParams): Promise<ResumeAnalysis> {
   try {
     console.log('Analyzing resume with params:', { 
@@ -32,7 +34,8 @@ export async function analyzeResume({
       contentProvided: !!resumeContent, 
       contentLength: resumeContent ? resumeContent.length : 0,
       jobId, 
-      applicantId 
+      applicantId,
+      forceUpdate 
     });
     
     // Get the Supabase anon key from the client instead of using process.env
@@ -40,7 +43,7 @@ export async function analyzeResume({
     const supabaseKey = session?.access_token || await getSBPublicKey();
     
     // First check if an analysis already exists for this application
-    if (jobId && applicantId) {
+    if (jobId && applicantId && !forceUpdate) {
       const existingAnalysis = await getExistingAnalysis(applicantId);
       if (existingAnalysis) {
         console.log('Found existing analysis for application', applicantId, existingAnalysis);
@@ -83,7 +86,8 @@ export async function analyzeResume({
           resumeContent,
           jobDescription,
           jobId,
-          applicantId
+          applicantId,
+          forceUpdate // Pass the forceUpdate parameter to the edge function
         }),
       }
     );
