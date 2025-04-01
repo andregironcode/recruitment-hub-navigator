@@ -1,17 +1,17 @@
-
 import React, { useState, useEffect } from "react";
 import { getApplicationsByJobId, updateApplicationStatus, getJobById } from "@/services/jobService";
 import { getJobApplicationsAnalyses, analyzeResume } from "@/services/aiService";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Mail, Phone, ArrowLeft, Brain, Filter, Users, Briefcase } from "lucide-react";
+import { FileText, Mail, Phone, ArrowLeft, Brain, Filter, Users, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { ResumeAnalysis } from "@/services/aiService";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface JobApplicantsProps {
   jobId: number;
@@ -46,9 +46,9 @@ const JobApplicants = ({ jobId, jobTitle, onBack }: JobApplicantsProps) => {
   const [aiLoading, setAiLoading] = useState(false);
   const [jobDescription, setJobDescription] = useState("");
   const [groupBy, setGroupBy] = useState<GroupBy>("none");
+  const [apiError, setApiError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Load job description for AI analysis
   useEffect(() => {
     const loadJobDetails = async () => {
       try {
@@ -69,16 +69,13 @@ const JobApplicants = ({ jobId, jobTitle, onBack }: JobApplicantsProps) => {
       setLoading(true);
       try {
         const data = await getApplicationsByJobId(jobId);
-        // Map and validate the status field
         const validatedApplicants = data.map(app => ({
           ...app,
-          // Use type guarding to ensure we have a valid status
           status: isValidStatus(app.status) ? app.status : 'new' as ApplicationStatus
         }));
         setApplicants(validatedApplicants);
         console.log("Loaded applicants for job:", validatedApplicants);
 
-        // Try to load existing analyses
         try {
           const analyses = await getJobApplicationsAnalyses(jobId);
           if (Object.keys(analyses).length > 0) {
@@ -139,6 +136,7 @@ const JobApplicants = ({ jobId, jobTitle, onBack }: JobApplicantsProps) => {
       return;
     }
 
+    setApiError(null);
     setAiLoading(true);
     toast({
       title: "AI Screening",
@@ -148,9 +146,9 @@ const JobApplicants = ({ jobId, jobTitle, onBack }: JobApplicantsProps) => {
     const applicantsWithResumes = applicants.filter(app => app.resumeUrl);
     const totalApplicants = applicantsWithResumes.length;
     let processedCount = 0;
+    let errorCount = 0;
 
     try {
-      // Process applicants in sequence
       const updatedApplicants = [...applicants];
       
       for (const applicant of applicantsWithResumes) {
@@ -162,7 +160,6 @@ const JobApplicants = ({ jobId, jobTitle, onBack }: JobApplicantsProps) => {
             applicant.id
           );
           
-          // Update this applicant with analysis
           const index = updatedApplicants.findIndex(a => a.id === applicant.id);
           if (index !== -1) {
             updatedApplicants[index] = {
@@ -180,17 +177,40 @@ const JobApplicants = ({ jobId, jobTitle, onBack }: JobApplicantsProps) => {
           }
         } catch (error) {
           console.error(`Error analyzing resume for applicant ${applicant.id}:`, error);
+          errorCount++;
+          
+          if (error instanceof Error && 
+             (error.message.includes("quota") || 
+              error.message.includes("API key") || 
+              error.message.includes("OpenAI"))) {
+            setApiError("OpenAI API quota exceeded or invalid API key. Please check your API key settings.");
+          }
         }
       }
       
       setApplicants(updatedApplicants);
       
-      toast({
-        title: "AI Screening Complete",
-        description: `Successfully analyzed ${processedCount} of ${totalApplicants} resumes`
-      });
+      if (errorCount === totalApplicants) {
+        toast({
+          title: "AI Screening Failed",
+          description: `All ${totalApplicants} resume analyses failed. Please check your API key and quota.`,
+          variant: "destructive"
+        });
+      } else if (errorCount > 0) {
+        toast({
+          title: "AI Screening Partially Complete",
+          description: `Successfully analyzed ${processedCount - errorCount} of ${totalApplicants} resumes. ${errorCount} failed.`,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "AI Screening Complete",
+          description: `Successfully analyzed ${processedCount} of ${totalApplicants} resumes`
+        });
+      }
     } catch (error) {
       console.error("Error in AI screening process:", error);
+      setApiError("An error occurred during AI screening. Please try again later.");
       toast({
         title: "Error",
         description: "An error occurred during AI screening",
@@ -354,6 +374,16 @@ const JobApplicants = ({ jobId, jobTitle, onBack }: JobApplicantsProps) => {
         </div>
       </div>
 
+      {apiError && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>API Error</AlertTitle>
+          <AlertDescription>
+            {apiError}
+          </AlertDescription>
+        </Alert>
+      )}
+
       {loading ? (
         <div className="flex justify-center py-8">
           <p>Loading applicants...</p>
@@ -491,7 +521,7 @@ const JobApplicants = ({ jobId, jobTitle, onBack }: JobApplicantsProps) => {
         </div>
       )}
 
-      {applicants.some(app => app.analysis) && (
+      {hasAnyAnalysis && !apiError && (
         <div className="mt-8">
           <Tabs defaultValue="overview">
             <TabsList>

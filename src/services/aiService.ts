@@ -33,6 +33,12 @@ export const analyzeResume = async (
     throw new Error('Failed to analyze resume');
   }
 
+  // Check if we got an error response from the edge function
+  if (data.error) {
+    console.error('Error from edge function:', data.error);
+    throw new Error(data.error);
+  }
+
   return data as ResumeAnalysis;
 };
 
