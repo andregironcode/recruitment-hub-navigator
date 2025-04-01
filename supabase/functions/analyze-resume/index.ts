@@ -217,7 +217,34 @@ serve(async (req) => {
         console.log(`Successfully uploaded PDF to OpenAI, file ID: ${fileId}`);
         
         try {
-          // Step 2: Create a new assistants API call that can process the PDF
+          // Step 2: Create a new assistant specifically for resume analysis
+          const assistantResponse = await fetch('https://api.openai.com/v1/assistants', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+              'Content-Type': 'application/json',
+              'OpenAI-Beta': 'assistants=v1'
+            },
+            body: JSON.stringify({
+              name: "Resume Analyzer",
+              description: "Analyzes resumes against job descriptions",
+              instructions: systemPrompt,
+              model: "gpt-4o-mini",
+              tools: []
+            })
+          });
+          
+          if (!assistantResponse.ok) {
+            const errorData = await assistantResponse.text();
+            console.error('Error creating assistant:', errorData);
+            throw new Error(`Failed to create assistant: ${assistantResponse.statusText}`);
+          }
+          
+          const assistantData = await assistantResponse.json();
+          const assistantId = assistantData.id;
+          console.log(`Successfully created assistant with ID: ${assistantId}`);
+          
+          // Step 3: Create a thread with the user's message and the uploaded file
           const userMessage = `Analyze how well the resume in the attached PDF matches the following job description:
           
           JOB DESCRIPTION:
@@ -233,7 +260,6 @@ serve(async (req) => {
             "overallScore": "A score from 0-100 representing overall match percentage"
           }`;
           
-          // Create a thread with the uploaded file
           const threadResponse = await fetch('https://api.openai.com/v1/threads', {
             method: 'POST',
             headers: {
@@ -262,7 +288,7 @@ serve(async (req) => {
           const threadId = threadData.id;
           console.log(`Successfully created thread with ID: ${threadId}`);
           
-          // Run the assistant on the thread
+          // Step 4: Run the assistant on the thread
           const runResponse = await fetch(`https://api.openai.com/v1/threads/${threadId}/runs`, {
             method: 'POST',
             headers: {
@@ -271,8 +297,7 @@ serve(async (req) => {
               'OpenAI-Beta': 'assistants=v1'
             },
             body: JSON.stringify({
-              assistant_id: 'asst_abc123', // Replace with your assistant ID
-              instructions: systemPrompt,
+              assistant_id: assistantId,
               model: 'gpt-4o-mini'
             })
           });
@@ -363,22 +388,38 @@ serve(async (req) => {
             throw new Error(`Failed to parse analysis result: ${parseError.message}`);
           }
           
-          // Clean up by deleting the file from OpenAI
+          // Clean up
           try {
-            const deleteResponse = await fetch(`https://api.openai.com/v1/files/${fileId}`, {
+            // Delete the assistant
+            const deleteAssistantResponse = await fetch(`https://api.openai.com/v1/assistants/${assistantId}`, {
+              method: 'DELETE',
+              headers: {
+                'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+                'OpenAI-Beta': 'assistants=v1'
+              }
+            });
+            
+            if (deleteAssistantResponse.ok) {
+              console.log(`Successfully deleted assistant ${assistantId}`);
+            } else {
+              console.warn(`Failed to delete assistant ${assistantId}: ${deleteAssistantResponse.statusText}`);
+            }
+            
+            // Delete the file from OpenAI
+            const deleteFileResponse = await fetch(`https://api.openai.com/v1/files/${fileId}`, {
               method: 'DELETE',
               headers: {
                 'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`
               }
             });
             
-            if (deleteResponse.ok) {
+            if (deleteFileResponse.ok) {
               console.log(`Successfully deleted file ${fileId} from OpenAI`);
             } else {
-              console.warn(`Failed to delete file ${fileId}: ${deleteResponse.statusText}`);
+              console.warn(`Failed to delete file ${fileId}: ${deleteFileResponse.statusText}`);
             }
           } catch (deleteError) {
-            console.warn(`Error deleting file ${fileId}:`, deleteError);
+            console.warn(`Error during cleanup:`, deleteError);
           }
           
           // Store analysis in database and return response
@@ -405,21 +446,7 @@ serve(async (req) => {
             );
           }
         } finally {
-          // If we haven't already deleted the file, try to delete it here
-          try {
-            const deleteResponse = await fetch(`https://api.openai.com/v1/files/${fileId}`, {
-              method: 'DELETE',
-              headers: {
-                'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`
-              }
-            });
-            
-            if (deleteResponse.ok) {
-              console.log(`Successfully deleted file ${fileId} from OpenAI (cleanup)`);
-            }
-          } catch (deleteError) {
-            console.warn(`Error in final cleanup of file ${fileId}:`, deleteError);
-          }
+          // Cleanup code already included in the try block above
         }
       } else {
         // For text-based resumes, use the regular chat completions API
