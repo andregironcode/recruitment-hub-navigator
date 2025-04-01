@@ -54,6 +54,8 @@ serve(async (req) => {
     }
     
     let resumeText = '';
+    let pdfBase64 = '';
+    let useVisionAPI = false;
     
     // Extract text from resume if URL is provided
     if (resumeUrl) {
@@ -74,47 +76,18 @@ serve(async (req) => {
           console.log(`File content type: ${contentType}`);
           
           if (contentType?.includes('application/pdf')) {
-            // For PDF files, use regular text extraction via OpenAI
-            // This avoids the vision API which is causing errors
             try {
               const pdfArrayBuffer = await response.arrayBuffer();
               const pdfBytes = new Uint8Array(pdfArrayBuffer);
               
-              // Convert the first portion of the PDF to base64 to analyze
-              // We limit the size to avoid hitting API limits
+              // Convert the PDF to base64, limit size to 1MB to avoid API limits
               const partialPdf = pdfBytes.slice(0, Math.min(pdfBytes.length, 1000000));
-              const pdfBase64 = btoa(String.fromCharCode(...partialPdf));
+              pdfBase64 = btoa(String.fromCharCode(...partialPdf));
+              useVisionAPI = true;
               
-              // Use OpenAI's API for text extraction
-              const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  model: 'gpt-4o-mini',
-                  messages: [
-                    { 
-                      role: 'user', 
-                      content: `I have a base64 encoded PDF that represents a resume. 
-                      I need you to extract the plain text content from this PDF.
-                      Here's the base64 encoded content (first 1MB only):
-                      ${pdfBase64}`
-                    }
-                  ],
-                  temperature: 0.1,
-                }),
-              });
-              
-              if (!openaiResponse.ok) {
-                const errorText = await openaiResponse.text();
-                throw new Error(`OpenAI error: ${errorText}`);
-              }
-              
-              const openaiData = await openaiResponse.json();
-              resumeText = openaiData.choices[0].message.content;
-              console.log(`Successfully extracted text from PDF, length: ${resumeText.length}`);
+              // Also try to get text content as fallback
+              resumeText = "PDF content attached directly to analysis prompt";
+              console.log("PDF prepared for vision API analysis");
             } catch (error) {
               console.error('Error processing PDF:', error);
               throw new Error(`Failed to process PDF: ${error.message}`);
@@ -146,9 +119,9 @@ serve(async (req) => {
     
     console.log(`Resume text (preview): ${resumeText.substring(0, 100)}...`);
     
-    // If we have no meaningful text to analyze, return a fallback analysis
-    if (!resumeText || resumeText.includes('Error accessing resume file') || resumeText.length < 50) {
-      console.log('Insufficient resume text, generating fallback analysis');
+    // If we have no meaningful text to analyze and no PDF, return a fallback analysis
+    if ((!resumeText || resumeText.includes('Error accessing resume file') || resumeText.length < 50) && !useVisionAPI) {
+      console.log('Insufficient resume text and no PDF, generating fallback analysis');
       
       const fallbackAnalysis = {
         educationLevel: "Unknown",
@@ -200,26 +173,74 @@ serve(async (req) => {
       );
     }
     
-    // Prepare prompt for OpenAI to analyze the resume against job description
-    const prompt = `
-    You're an AI recruitment assistant tasked with analyzing resumes against job descriptions.
+    // Prepare the messages for OpenAI to analyze the resume against job description
+    let messages = [];
     
-    JOB DESCRIPTION:
-    ${jobDescription}
-    
-    RESUME:
-    ${resumeText}
-    
-    Analyze how well this resume matches the job description and return ONLY a JSON object with these fields:
-    1. educationLevel: The candidate's highest level of education mentioned (or "Unknown" if not found)
-    2. yearsExperience: Total relevant years of experience (or "Unknown" if not clearly stated)
-    3. skillsMatch: Overall match as "High", "Medium", or "Low"
-    4. keySkills: Array of key skills found in resume that match job requirements
-    5. missingRequirements: Array of key requirements from job description not found in resume
-    6. overallScore: A numeric score from 0-100 representing overall match percentage
-    
-    Return your analysis as clean, parseable JSON WITHOUT explanations, code blocks, or other text.
-    `;
+    if (useVisionAPI && pdfBase64) {
+      // Use vision API with PDF attachment for direct analysis
+      messages = [
+        { 
+          role: 'system', 
+          content: `You are an AI recruitment assistant that analyzes resumes against job descriptions.`
+        },
+        { 
+          role: 'user', 
+          content: [
+            { 
+              type: 'text', 
+              text: `Analyze how well this resume matches the following job description:
+              
+              JOB DESCRIPTION:
+              ${jobDescription}
+              
+              Analyze the resume and return ONLY a JSON object with these fields:
+              1. educationLevel: The candidate's highest level of education mentioned (or "Unknown" if not found)
+              2. yearsExperience: Total relevant years of experience (or "Unknown" if not clearly stated)
+              3. skillsMatch: Overall match as "High", "Medium", or "Low"
+              4. keySkills: Array of key skills found in resume that match job requirements
+              5. missingRequirements: Array of key requirements from job description not found in resume
+              6. overallScore: A numeric score from 0-100 representing overall match percentage
+              
+              Return your analysis as clean, parseable JSON WITHOUT explanations, code blocks, or other text.`
+            },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:application/pdf;base64,${pdfBase64}`
+              }
+            }
+          ]
+        }
+      ];
+      
+      console.log("Using vision API for resume analysis with attached PDF");
+    } else {
+      // Use text-only approach
+      messages = [
+        { 
+          role: 'user', 
+          content: `You're an AI recruitment assistant tasked with analyzing resumes against job descriptions.
+      
+          JOB DESCRIPTION:
+          ${jobDescription}
+          
+          RESUME:
+          ${resumeText}
+          
+          Analyze how well this resume matches the job description and return ONLY a JSON object with these fields:
+          1. educationLevel: The candidate's highest level of education mentioned (or "Unknown" if not found)
+          2. yearsExperience: Total relevant years of experience (or "Unknown" if not clearly stated)
+          3. skillsMatch: Overall match as "High", "Medium", or "Low"
+          4. keySkills: Array of key skills found in resume that match job requirements
+          5. missingRequirements: Array of key requirements from job description not found in resume
+          6. overallScore: A numeric score from 0-100 representing overall match percentage
+          
+          Return your analysis as clean, parseable JSON WITHOUT explanations, code blocks, or other text.`
+        }
+      ];
+      
+      console.log("Using text-only approach for resume analysis");
+    }
     
     try {
       // Send the prompt to OpenAI for analysis
@@ -230,8 +251,8 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [{ role: 'user', content: prompt }],
+          model: useVisionAPI ? 'gpt-4o' : 'gpt-4o-mini', // Use gpt-4o for vision API
+          messages: messages,
           temperature: 0.3,
         }),
       });
