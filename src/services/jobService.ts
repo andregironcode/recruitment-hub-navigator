@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Job } from '@/components/jobs/JobList';
 import { JobSearchFilters } from '@/components/jobs/JobSearch';
@@ -31,6 +30,39 @@ export const getAllJobs = async (): Promise<Job[]> => {
     featured: job.featured || false,
     category: job.category || undefined
   }));
+};
+
+/**
+ * Get a job by ID
+ */
+export const getJobById = async (id: number): Promise<Job | null> => {
+  const { data, error } = await supabase
+    .from('jobs')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) {
+    console.error('Error fetching job by ID:', error);
+    throw new Error('Failed to fetch job');
+  }
+
+  if (!data) return null;
+
+  // Map from database schema to our Job type
+  return {
+    id: data.id,
+    title: data.title,
+    company: data.company,
+    location: data.location,
+    salary: data.salary || '',
+    jobType: data.job_type, // Map job_type to jobType
+    industry: data.industry,
+    description: data.description,
+    postedDate: data.posted_date ? new Date(data.posted_date).toLocaleDateString() : 'Today',
+    featured: data.featured || false,
+    category: data.category || undefined
+  };
 };
 
 /**
