@@ -93,6 +93,14 @@ export async function analyzeResume({
       });
     }
     
+    // Check if URL ends with pdf to ensure we're passing the full URL to the edge function
+    // Sometimes URLs can get truncated and this causes issues with PDF detection
+    if (resumeUrl && !resumeUrl.endsWith('.pdf') && resumeUrl.includes('.pdf')) {
+      resumeUrl = resumeUrl.substring(0, resumeUrl.indexOf('.pdf') + 4);
+      console.log('Fixed PDF URL:', resumeUrl);
+    }
+    
+    // Send to edge function for analysis
     const response = await fetch(
       'https://rtuzdeaxmpikwuvplcbh.supabase.co/functions/v1/analyze-resume',
       {
@@ -135,14 +143,15 @@ export async function analyzeResume({
     const data = await response.json();
     console.log('Received analysis result:', data);
 
+    // Validate and return the analysis data
     return {
       educationLevel: data.educationLevel || 'Not available',
       yearsExperience: data.yearsExperience || 'Not available',
       skillsMatch: data.skillsMatch || 'Low',
-      keySkills: data.keySkills || [],
-      missingRequirements: data.missingRequirements || [],
-      overallScore: data.overallScore || 0,
-      fallback: data.fallback,
+      keySkills: Array.isArray(data.keySkills) ? data.keySkills : [],
+      missingRequirements: Array.isArray(data.missingRequirements) ? data.missingRequirements : [],
+      overallScore: typeof data.overallScore === 'number' ? data.overallScore : 0,
+      fallback: !!data.fallback,
       debugInfo: data.debugInfo || data.error || null
     };
   } catch (error) {
