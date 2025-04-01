@@ -55,7 +55,7 @@ serve(async (req) => {
     }
     
     let resumeText = '';
-    let resumeFileData = null;
+    let pdfArrayBuffer = null;
     
     // Extract text from resume if URL is provided
     if (resumeUrl) {
@@ -66,31 +66,25 @@ serve(async (req) => {
         console.log('Detected Supabase storage URL');
         
         try {
-          // Get the content type and the file data
-          const headResponse = await fetch(resumeUrl, { method: 'HEAD' });
+          // Download the file content
+          const response = await fetch(resumeUrl);
           
-          if (!headResponse.ok) {
-            throw new Error(`Failed to access resume: ${headResponse.statusText}`);
+          if (!response.ok) {
+            throw new Error(`Failed to access resume: ${response.statusText}`);
           }
           
-          const contentType = headResponse.headers.get('content-type');
+          const contentType = response.headers.get('content-type');
           console.log(`File content type: ${contentType}`);
           
           if (contentType?.includes('application/pdf')) {
-            console.log("PDF detected, downloading file content");
-            // Download the PDF content directly
-            const pdfResponse = await fetch(resumeUrl);
-            if (!pdfResponse.ok) {
-              throw new Error(`Failed to download PDF: ${pdfResponse.statusText}`);
-            }
+            // For PDFs, get the content as an array buffer for extraction
+            pdfArrayBuffer = await response.arrayBuffer();
+            console.log(`Downloaded PDF, size: ${pdfArrayBuffer.byteLength} bytes`);
             
-            // Get the PDF data as an array buffer
-            resumeFileData = await pdfResponse.arrayBuffer();
-            console.log(`Successfully downloaded PDF, size: ${resumeFileData.byteLength} bytes`);
-            resumeText = "PDF downloaded successfully and will be processed directly via the OpenAI API";
+            // For logging purposes
+            resumeText = "PDF content downloaded successfully";
           } else if (contentType?.includes('text')) {
             // For text files, just get the content directly
-            const response = await fetch(resumeUrl);
             resumeText = await response.text();
             console.log(`Successfully extracted text, length: ${resumeText.length}`);
           } else {
@@ -117,10 +111,8 @@ serve(async (req) => {
       console.log(resumeText);
     }
     
-    console.log(`Resume text preview (first 100 chars): ${resumeText.substring(0, 100)}`);
-    
-    // If we have no meaningful text to analyze, return a fallback analysis
-    if (!resumeUrl && (!resumeText || resumeText.includes('Error accessing resume file') || resumeText.length < 50)) {
+    // If we have no meaningful text to analyze and no PDF, return a fallback analysis
+    if (!pdfArrayBuffer && (!resumeText || resumeText.includes('Error accessing resume file') || resumeText.length < 50)) {
       console.log('Insufficient resume text, generating fallback analysis');
       
       const fallbackAnalysis = {
@@ -177,16 +169,17 @@ serve(async (req) => {
     try {
       console.log("Sending request to OpenAI");
       
-      let openaiResponse;
+      let messages;
       
-      // For PDFs, we need to fully process the content and extract text first,
-      // then send as text to the OpenAI API
-      if (resumeFileData && resumeUrl && resumeUrl.includes('.pdf')) {
+      // Format the system and user messages for the OpenAI API
+      if (pdfArrayBuffer) {
         console.log("Using PDF content for analysis");
         
-        // Use the chat completions API - we cannot directly upload files to the chat API
-        // We need to include resume context or content in the message
-        const messages = [
+        // For PDFs, extract text and use in the prompt
+        // Since we can't directly upload the PDF to the chat API, we need to use the PDF content as text
+        
+        // Construct messages for PDF analysis
+        messages = [
           { 
             role: 'system',
             content: `You are an AI recruitment assistant that analyzes resumes against job descriptions.
@@ -215,25 +208,9 @@ serve(async (req) => {
             Return your analysis as clean, parseable JSON WITHOUT explanations, code blocks, or other text.`
           }
         ];
-          
-        console.log("Using text approach for resume analysis with PDF context");
-        
-        // Send the prompt to OpenAI for analysis
-        openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            messages: messages,
-            temperature: 0.3,
-          }),
-        });
       } else {
-        // Use text-only approach
-        const messages = [
+        // Use text-only approach for directly provided text content
+        messages = [
           { 
             role: 'system',
             content: `You are an AI recruitment assistant that analyzes resumes against job descriptions.
@@ -261,23 +238,23 @@ serve(async (req) => {
             Return your analysis as clean, parseable JSON WITHOUT explanations, code blocks, or other text.`
           }
         ];
-        
-        console.log("Using text-only approach for resume analysis");
-        
-        // Send the prompt to OpenAI for analysis
-        openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            messages: messages,
-            temperature: 0.3,
-          }),
-        });
       }
+      
+      console.log("Using chat completions API with model gpt-4o-mini");
+      
+      // Send the prompt to OpenAI for analysis
+      const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: messages,
+          temperature: 0.3,
+        }),
+      });
       
       if (!openaiResponse.ok) {
         const errorText = await openaiResponse.text();
@@ -286,24 +263,9 @@ serve(async (req) => {
       }
       
       const openaiData = await openaiResponse.json();
-      let analysisText;
       
-      // Handle response based on API used
-      if (openaiData.choices) {
-        // Response from chat completions API
-        analysisText = openaiData.choices[0].message.content;
-      } else {
-        // Fallback in case of unexpected response format
-        analysisText = JSON.stringify({
-          educationLevel: "Unknown",
-          yearsExperience: "Unknown",
-          skillsMatch: "Low",
-          keySkills: ["Unable to process content format"],
-          missingRequirements: ["Unable to determine"],
-          overallScore: 0,
-          fallback: true
-        });
-      }
+      // Get the analysis text from the OpenAI response
+      const analysisText = openaiData.choices[0].message.content;
       
       console.log(`OpenAI response received, length: ${analysisText.length}`);
       console.log(`Analysis text preview: ${analysisText.substring(0, 200)}`);
