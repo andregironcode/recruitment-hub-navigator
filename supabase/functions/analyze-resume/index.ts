@@ -83,8 +83,22 @@ serve(async (req) => {
             pdfBuffer = await response.arrayBuffer();
             console.log(`Downloaded PDF, size: ${pdfBuffer.byteLength} bytes`);
             
-            // Set temporary text to identify this is a PDF
-            resumeText = "[PDF_CONTENTS]";
+            // Extract text directly from PDF instead of using Vision API
+            try {
+              const textDecoder = new TextDecoder();
+              resumeText = textDecoder.decode(pdfBuffer);
+              
+              // Limit text length to avoid token limits
+              if (resumeText.length > 100000) {
+                console.log(`PDF text is very long (${resumeText.length} chars), truncating to 100K chars`);
+                resumeText = resumeText.substring(0, 100000);
+              }
+              
+              console.log(`Extracted ${resumeText.length} characters of text from PDF`);
+            } catch (extractError) {
+              console.error('Error extracting text from PDF:', extractError);
+              resumeText = "[PDF_CONTENTS] Unable to extract text fully";
+            }
           } else if (contentType?.includes('text')) {
             // For text files, just get the content directly
             resumeText = await response.text();
@@ -185,104 +199,43 @@ serve(async (req) => {
       
       Be thorough in your analysis and provide an accurate assessment of the candidate's match for the position.`;
 
-      let openaiResponse;
+      // Prepare the user prompt
+      const userPrompt = `Analyze how well the following resume matches the job description:
       
-      if (isPdfFile && pdfBuffer) {
-        console.log("PDF detected, preparing for analysis with standard text-based approach");
-        
-        try {
-          // For PDF files, we'll extract text and use it directly instead of using vision
-          const textDecoder = new TextDecoder();
-          let pdfText = textDecoder.decode(pdfBuffer);
-          
-          // Limit text length to avoid token limits
-          if (pdfText.length > 100000) {
-            console.log(`PDF text is very long (${pdfText.length} chars), truncating to 100K chars`);
-            pdfText = pdfText.substring(0, 100000);
-          }
-          
-          console.log(`Extracted ${pdfText.length} characters of text from PDF`);
-          
-          // Prepare the user prompt
-          const userPrompt = `Analyze how well the following resume matches the job description:
-          
-          JOB DESCRIPTION:
-          ${jobDescription}
-          
-          RESUME:
-          ${pdfText}
-          
-          Return ONLY a clean JSON object with these fields (no markdown, no explanations, just valid JSON):
-          {
-            "educationLevel": "The candidate's highest level of education (Bachelor's, Master's, PhD, etc., or 'Unknown' if not found)",
-            "yearsExperience": "Total relevant years of experience (a number, range, or 'Unknown' if not clearly stated)",
-            "skillsMatch": "Overall match level ('High', 'Medium', or 'Low')",
-            "keySkills": ["Array of specific skills from resume that match job requirements"],
-            "missingRequirements": ["Array of key requirements from job description not found in resume"],
-            "overallScore": "A score from 0-100 representing overall match percentage"
-          }`;
-          
-          console.log("Sending text-based PDF content to OpenAI");
-          
-          // Send to OpenAI for analysis
-          openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: 'gpt-4o-mini',
-              messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userPrompt }
-              ],
-              temperature: 0.1,
-            }),
-          });
-        } catch (extractError) {
-          console.error('Error extracting text from PDF:', extractError);
-          throw new Error(`Failed to extract text from PDF: ${extractError.message}`);
-        }
-      } else {
-        // For text-based resumes, use the regular chat completions API
-        const userPrompt = `Analyze how well the following resume matches the job description:
-        
-        JOB DESCRIPTION:
-        ${jobDescription}
-        
-        RESUME:
-        ${resumeText}
-        
-        Return ONLY a clean JSON object with these fields (no markdown, no explanations, just valid JSON):
-        {
-          "educationLevel": "The candidate's highest level of education (Bachelor's, Master's, PhD, etc., or 'Unknown' if not found)",
-          "yearsExperience": "Total relevant years of experience (a number, range, or 'Unknown' if not clearly stated)",
-          "skillsMatch": "Overall match level ('High', 'Medium', or 'Low')",
-          "keySkills": ["Array of specific skills from resume that match job requirements"],
-          "missingRequirements": ["Array of key requirements from job description not found in resume"],
-          "overallScore": "A score from 0-100 representing overall match percentage"
-        }`;
-        
-        console.log("Sending request to OpenAI for text analysis");
-        
-        // Send the prompt to OpenAI for analysis
-        openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',  // Using gpt-4o-mini as requested
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: userPrompt }
-            ],
-            temperature: 0.1,  // Lower temperature for more consistent results
-          }),
-        });
-      }
+      JOB DESCRIPTION:
+      ${jobDescription}
+      
+      RESUME:
+      ${resumeText}
+      
+      Return ONLY a clean JSON object with these fields (no markdown, no explanations, just valid JSON):
+      {
+        "educationLevel": "The candidate's highest level of education (Bachelor's, Master's, PhD, etc., or 'Unknown' if not found)",
+        "yearsExperience": "Total relevant years of experience (a number, range, or 'Unknown' if not clearly stated)",
+        "skillsMatch": "Overall match level ('High', 'Medium', or 'Low')",
+        "keySkills": ["Array of specific skills from resume that match job requirements"],
+        "missingRequirements": ["Array of key requirements from job description not found in resume"],
+        "overallScore": "A score from 0-100 representing overall match percentage"
+      }`;
+      
+      console.log("Sending text-based request to OpenAI for analysis");
+      
+      // Send to OpenAI for analysis
+      const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          temperature: 0.1,
+        }),
+      });
       
       if (!openaiResponse.ok) {
         const errorText = await openaiResponse.text();
