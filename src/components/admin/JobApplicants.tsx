@@ -1,16 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { getApplicationsByJobId, updateApplicationStatus, getJobById } from "@/services/jobService";
-import { getJobApplicationsAnalyses, analyzeResume } from "@/services/aiService";
+import { getJobApplicationsAnalyses, analyzeResume, ResumeAnalysis } from "@/services/aiService";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Mail, Phone, ArrowLeft, Brain, Filter, Users, AlertTriangle } from "lucide-react";
+import { FileText, Mail, Phone, ArrowLeft, Brain, Filter, Users, AlertTriangle, InfoIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { ResumeAnalysis } from "@/services/aiService";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface JobApplicantsProps {
@@ -323,6 +322,7 @@ const JobApplicants = ({ jobId, jobTitle, onBack }: JobApplicantsProps) => {
 
   const groupedApplicants = groupApplicants();
   const hasAnyAnalysis = applicants.some(app => !!app.analysis);
+  const isDemoMode = applicants.some(app => app.analysis?.demoMode);
 
   return (
     <div className="space-y-4">
@@ -335,6 +335,18 @@ const JobApplicants = ({ jobId, jobTitle, onBack }: JobApplicantsProps) => {
           Applicants for "{jobTitle}"
         </h2>
       </div>
+
+      {isDemoMode && (
+        <Alert className="bg-blue-50 border-blue-200">
+          <InfoIcon className="h-4 w-4 text-blue-500" />
+          <AlertTitle className="text-blue-700">Demo Analysis Mode</AlertTitle>
+          <AlertDescription className="text-blue-600">
+            The AI resume analysis is running in demonstration mode. It does not actually read resume contents
+            but generates plausible analysis based on the job description. For a production system, you would need
+            to implement resume content extraction and proper analysis.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="flex flex-wrap gap-4 items-center justify-between">
         <div className="flex gap-3">
@@ -462,7 +474,7 @@ const JobApplicants = ({ jobId, jobTitle, onBack }: JobApplicantsProps) => {
                               {applicant.analysis ? (
                                 <div className="space-y-1">
                                   <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getMatchColor(applicant.analysis.skillsMatch)}`}>
-                                    {applicant.analysis.skillsMatch} ({applicant.analysis.overallScore}%)
+                                    {applicant.analysis.skillsMatch} ({applicant.analysis.overallScore}%) 
                                   </span>
                                   <Progress value={applicant.analysis.overallScore} className="h-1 w-16" />
                                 </div>

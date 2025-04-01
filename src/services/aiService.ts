@@ -10,10 +10,14 @@ export interface ResumeAnalysis {
   overallScore: number;
   _note?: string;
   _error?: string;
+  demoMode?: boolean;
+  fallback?: boolean;
 }
 
 /**
  * Analyze a resume against a job description
+ * 
+ * Note: In the current version, this is a demo that simulates analysis without actually processing resume contents
  */
 export const analyzeResume = async (
   resumeUrl: string, 
@@ -72,7 +76,8 @@ export const getApplicationAnalysis = async (applicationId: number): Promise<Res
     skillsMatch: data.skills_match,
     keySkills: data.key_skills,
     missingRequirements: data.missing_requirements,
-    overallScore: data.overall_score
+    overallScore: data.overall_score,
+    demoMode: true // Add this flag to indicate it's a demo analysis
   };
 };
 
@@ -99,7 +104,8 @@ export const getJobApplicationsAnalyses = async (jobId: number): Promise<Record<
       skillsMatch: item.skills_match,
       keySkills: item.key_skills,
       missingRequirements: item.missing_requirements,
-      overallScore: item.overall_score
+      overallScore: item.overall_score,
+      demoMode: true // Add this flag to indicate it's a demo analysis
     };
   });
 

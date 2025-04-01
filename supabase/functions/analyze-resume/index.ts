@@ -36,15 +36,16 @@ serve(async (req) => {
         throw new Error("OpenAI API key is not configured");
       }
 
-      // Craft a simplified prompt that works even without resume content
+      // Note: We're currently using a demonstration mode that doesn't actually parse resumes
+      // In a production system, you would extract and analyze the actual resume content
       const prompt = `
       You are an expert HR AI assistant that analyzes job applications.
       
       Job Description: ${jobDescription}
       
-      ${resumeUrl ? `The applicant has submitted a resume (content unavailable for direct analysis).` : 'No resume was provided.'}
-      
-      Based on the job description, generate a realistic and varied analysis that represents what a typical qualified candidate might look like.
+      IMPORTANT NOTE: This is a demonstration version that does not actually parse resume content.
+      Please generate a simulated analysis for demonstration purposes only.
+      Label any outputs clearly as "DEMO MODE" to indicate this is not a real analysis.
       
       Return ONLY valid JSON with these fields:
       {
@@ -53,7 +54,8 @@ serve(async (req) => {
         "skillsMatch": string (choose randomly from "Low", "Medium", "High"),
         "keySkills": string[] (list up to 5 skills that would be relevant based on the job description),
         "missingRequirements": string[] (list up to 3 potential missing skills based on the job description),
-        "overallScore": number (generate a realistic score between 30-95)
+        "overallScore": number (generate a realistic score between 30-95),
+        "demoMode": true
       }
       `;
 
@@ -71,7 +73,7 @@ serve(async (req) => {
               { role: 'system', content: 'You are an expert HR assistant that analyzes job applications.' },
               { role: 'user', content: prompt }
             ],
-            temperature: 0.7, // Increased for more variation
+            temperature: 0.7,
           }),
         });
 
@@ -82,8 +84,17 @@ serve(async (req) => {
         }
 
         const openAiData = await openAiResponse.json();
-        const resultContent = openAiData.choices[0].message.content;
+        let resultContent = openAiData.choices[0].message.content;
+        
+        // Handle the case where GPT wraps the JSON in markdown code blocks
+        if (resultContent.includes('```json')) {
+          resultContent = resultContent.replace(/```json\n|\n```/g, '');
+        }
+        
         const analysisResult = JSON.parse(resultContent);
+        
+        // Ensure demoMode is set
+        analysisResult.demoMode = true;
         
         // Store the analysis result in the database if we have jobId and applicantId
         if (jobId && applicantId) {
@@ -115,6 +126,7 @@ serve(async (req) => {
         
         // Generate a fallback analysis without calling OpenAI
         const fallbackAnalysis = generateFallbackAnalysis(jobDescription);
+        fallbackAnalysis.demoMode = true;
 
         // Store the fallback analysis if we have jobId and applicantId
         if (jobId && applicantId) {
@@ -145,7 +157,9 @@ serve(async (req) => {
         return new Response(
           JSON.stringify({
             ...fallbackAnalysis,
-            _note: "Generated without OpenAI due to API limitations"
+            _note: "Generated without OpenAI due to API limitations",
+            fallback: true,
+            demoMode: true
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -155,12 +169,15 @@ serve(async (req) => {
       
       // Generate a fallback analysis
       const fallbackAnalysis = generateFallbackAnalysis(jobDescription);
+      fallbackAnalysis.demoMode = true;
       
       return new Response(
         JSON.stringify({
           ...fallbackAnalysis,
           _note: "Fallback analysis due to API error",
-          _error: aiError.message
+          _error: aiError.message,
+          fallback: true,
+          demoMode: true
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -172,7 +189,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         error: "Function failed: " + error.message,
-        fallback: true
+        fallback: true,
+        demoMode: true
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
@@ -277,6 +295,7 @@ function generateFallbackAnalysis(jobDescription: string) {
     skillsMatch: overallScore > 75 ? "High" : overallScore > 60 ? "Medium" : "Low",
     keySkills,
     missingRequirements: missingSkills,
-    overallScore
+    overallScore,
+    demoMode: true
   };
 }
