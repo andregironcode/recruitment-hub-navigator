@@ -8,6 +8,8 @@ export interface ResumeAnalysis {
   keySkills: string[];
   missingRequirements: string[];
   overallScore: number;
+  _note?: string;
+  _error?: string;
 }
 
 /**
@@ -19,27 +21,32 @@ export const analyzeResume = async (
   jobId?: number,
   applicantId?: number
 ): Promise<ResumeAnalysis> => {
-  const { data, error } = await supabase.functions.invoke('analyze-resume', {
-    body: {
-      resumeUrl,
-      jobDescription,
-      jobId,
-      applicantId
+  try {
+    const { data, error } = await supabase.functions.invoke('analyze-resume', {
+      body: {
+        resumeUrl,
+        jobDescription,
+        jobId,
+        applicantId
+      }
+    });
+
+    if (error) {
+      console.error('Error analyzing resume:', error);
+      throw new Error('Failed to analyze resume');
     }
-  });
 
-  if (error) {
-    console.error('Error analyzing resume:', error);
-    throw new Error('Failed to analyze resume');
+    // Check if we got an error response from the edge function
+    if (data.error) {
+      console.error('Error from edge function:', data.error);
+      throw new Error(data.error);
+    }
+
+    return data as ResumeAnalysis;
+  } catch (err) {
+    console.error('Resume analysis error:', err);
+    throw err;
   }
-
-  // Check if we got an error response from the edge function
-  if (data.error) {
-    console.error('Error from edge function:', data.error);
-    throw new Error(data.error);
-  }
-
-  return data as ResumeAnalysis;
 };
 
 /**
