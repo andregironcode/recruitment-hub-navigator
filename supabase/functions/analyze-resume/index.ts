@@ -79,7 +79,7 @@ serve(async (req) => {
           
           if (contentType?.includes('application/pdf')) {
             isPdfFile = true;
-            // For PDFs, store the buffer for later uploading to OpenAI
+            // For PDFs, store the buffer for later text extraction
             pdfBuffer = await response.arrayBuffer();
             console.log(`Downloaded PDF, size: ${pdfBuffer.byteLength} bytes`);
             
@@ -185,269 +185,126 @@ serve(async (req) => {
       
       Be thorough in your analysis and provide an accurate assessment of the candidate's match for the position.`;
 
-      // Analyze PDF using OpenAI's API
-      let messages = [];
       let openaiResponse;
       
       if (isPdfFile && pdfBuffer) {
-        console.log("Processing PDF resume using OpenAI");
+        console.log("PDF detected, prepared for analysis");
         
-        // Step 1: First upload the PDF file to OpenAI
-        const formData = new FormData();
-        const pdfBlob = new Blob([pdfBuffer], { type: 'application/pdf' });
-        formData.append('file', pdfBlob, 'resume.pdf');
-        formData.append('purpose', 'assistants');
+        // Convert ArrayBuffer to base64 for sending in the request body
+        const uint8Array = new Uint8Array(pdfBuffer);
+        let binaryString = '';
+        uint8Array.forEach(byte => {
+            binaryString += String.fromCharCode(byte);
+        });
+        const base64Data = btoa(binaryString);
         
-        const uploadResponse = await fetch('https://api.openai.com/v1/files', {
+        // Prepare the user prompt that includes instructions to analyze the resume
+        const userPrompt = `Analyze how well the resume in the attached PDF matches the following job description:
+        
+        JOB DESCRIPTION:
+        ${jobDescription}
+        
+        Return ONLY a clean JSON object with these fields (no markdown, no explanations, just valid JSON):
+        {
+          "educationLevel": "The candidate's highest level of education (Bachelor's, Master's, PhD, etc., or 'Unknown' if not found)",
+          "yearsExperience": "Total relevant years of experience (a number, range, or 'Unknown' if not clearly stated)",
+          "skillsMatch": "Overall match level ('High', 'Medium', or 'Low')",
+          "keySkills": ["Array of specific skills from resume that match job requirements"],
+          "missingRequirements": ["Array of key requirements from job description not found in resume"],
+          "overallScore": "A score from 0-100 representing overall match percentage"
+        }`;
+        
+        // Send to OpenAI for analysis, using the PDF content as an attachment
+        openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`
+            'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+            'Content-Type': 'application/json',
           },
-          body: formData
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { 
+                role: 'user', 
+                content: [
+                  { type: 'text', text: userPrompt },
+                  {
+                    type: 'image_url',
+                    image_url: {
+                      url: `data:application/pdf;base64,${base64Data}`,
+                      detail: 'high'
+                    }
+                  }
+                ]
+              }
+            ],
+            temperature: 0.1,
+          }),
         });
         
-        if (!uploadResponse.ok) {
-          const errorData = await uploadResponse.text();
-          console.error('Error uploading PDF to OpenAI:', errorData);
-          throw new Error(`Failed to upload PDF to OpenAI: ${uploadResponse.statusText}`);
+        if (!openaiResponse.ok) {
+          const errorText = await openaiResponse.text();
+          console.error(`OpenAI API error: ${openaiResponse.status} - ${errorText}`);
+          throw new Error(`OpenAI API error: ${openaiResponse.statusText} (${openaiResponse.status})`);
         }
         
-        const uploadData = await uploadResponse.json();
-        const fileId = uploadData.id;
-        console.log(`Successfully uploaded PDF to OpenAI, file ID: ${fileId}`);
+        const openaiData = await openaiResponse.json();
         
+        // Get the analysis text from the OpenAI response
+        const analysisText = openaiData.choices[0].message.content;
+        
+        console.log(`OpenAI response received, length: ${analysisText.length}`);
+        console.log(`Analysis text preview: ${analysisText.substring(0, 200)}`);
+        
+        // Try to parse the result as JSON
+        let analysis;
         try {
-          // Step 2: Create a new assistant specifically for resume analysis
-          const assistantResponse = await fetch('https://api.openai.com/v1/assistants', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-              'Content-Type': 'application/json',
-              'OpenAI-Beta': 'assistants=v1'
-            },
-            body: JSON.stringify({
-              name: "Resume Analyzer",
-              description: "Analyzes resumes against job descriptions",
-              instructions: systemPrompt,
-              model: "gpt-4o-mini",
-              tools: []
-            })
-          });
-          
-          if (!assistantResponse.ok) {
-            const errorData = await assistantResponse.text();
-            console.error('Error creating assistant:', errorData);
-            throw new Error(`Failed to create assistant: ${assistantResponse.statusText}`);
-          }
-          
-          const assistantData = await assistantResponse.json();
-          const assistantId = assistantData.id;
-          console.log(`Successfully created assistant with ID: ${assistantId}`);
-          
-          // Step 3: Create a thread with the user's message and the uploaded file
-          const userMessage = `Analyze how well the resume in the attached PDF matches the following job description:
-          
-          JOB DESCRIPTION:
-          ${jobDescription}
-          
-          Return ONLY a clean JSON object with these fields (no markdown, no explanations, just valid JSON):
-          {
-            "educationLevel": "The candidate's highest level of education (Bachelor's, Master's, PhD, etc., or 'Unknown' if not found)",
-            "yearsExperience": "Total relevant years of experience (a number, range, or 'Unknown' if not clearly stated)",
-            "skillsMatch": "Overall match level ('High', 'Medium', or 'Low')",
-            "keySkills": ["Array of specific skills from resume that match job requirements"],
-            "missingRequirements": ["Array of key requirements from job description not found in resume"],
-            "overallScore": "A score from 0-100 representing overall match percentage"
-          }`;
-          
-          const threadResponse = await fetch('https://api.openai.com/v1/threads', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-              'Content-Type': 'application/json',
-              'OpenAI-Beta': 'assistants=v1'
-            },
-            body: JSON.stringify({
-              messages: [
-                {
-                  role: 'user',
-                  content: userMessage,
-                  file_ids: [fileId]
-                }
-              ]
-            })
-          });
-          
-          if (!threadResponse.ok) {
-            const errorData = await threadResponse.text();
-            console.error('Error creating thread:', errorData);
-            throw new Error(`Failed to create thread: ${threadResponse.statusText}`);
-          }
-          
-          const threadData = await threadResponse.json();
-          const threadId = threadData.id;
-          console.log(`Successfully created thread with ID: ${threadId}`);
-          
-          // Step 4: Run the assistant on the thread
-          const runResponse = await fetch(`https://api.openai.com/v1/threads/${threadId}/runs`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-              'Content-Type': 'application/json',
-              'OpenAI-Beta': 'assistants=v1'
-            },
-            body: JSON.stringify({
-              assistant_id: assistantId,
-              model: 'gpt-4o-mini'
-            })
-          });
-          
-          if (!runResponse.ok) {
-            const errorData = await runResponse.text();
-            console.error('Error running assistant:', errorData);
-            throw new Error(`Failed to run assistant: ${runResponse.statusText}`);
-          }
-          
-          const runData = await runResponse.json();
-          const runId = runData.id;
-          console.log(`Started run with ID: ${runId}`);
-          
-          // Poll for the run to complete
-          let runStatus = 'queued';
-          let retries = 0;
-          const maxRetries = 60; // 5 minutes with 5-second intervals
-          
-          while (runStatus !== 'completed' && retries < maxRetries) {
-            await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+          // Clean the response to ensure it's valid JSON
+          const cleanedText = analysisText.trim()
+            .replace(/```json/g, '')  // Remove markdown code blocks if present
+            .replace(/```/g, '')      // Remove closing code blocks
+            .trim();
             
-            const statusResponse = await fetch(`https://api.openai.com/v1/threads/${threadId}/runs/${runId}`, {
-              headers: {
-                'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-                'OpenAI-Beta': 'assistants=v1'
-              }
-            });
-            
-            if (!statusResponse.ok) {
-              console.error(`Error checking run status: ${statusResponse.statusText}`);
-              retries++;
-              continue;
-            }
-            
-            const statusData = await statusResponse.json();
-            runStatus = statusData.status;
-            console.log(`Run status: ${runStatus} (attempt ${retries + 1})`);
-            
-            if (runStatus === 'failed' || runStatus === 'cancelled' || runStatus === 'expired') {
-              throw new Error(`Run ended with status: ${runStatus}`);
-            }
-            
-            retries++;
-          }
+          analysis = JSON.parse(cleanedText);
+          console.log("Successfully parsed analysis result as JSON");
           
-          if (runStatus !== 'completed') {
-            throw new Error('Run did not complete in the allowed time');
-          }
+          // Ensure all required fields exist
+          analysis.educationLevel = analysis.educationLevel || "Not available";
+          analysis.yearsExperience = analysis.yearsExperience || "Not available";
+          analysis.skillsMatch = analysis.skillsMatch || "Low";
+          analysis.keySkills = analysis.keySkills || [];
+          analysis.missingRequirements = analysis.missingRequirements || [];
+          analysis.overallScore = typeof analysis.overallScore === 'number' ? 
+            analysis.overallScore : 
+            (typeof analysis.overallScore === 'string' ? parseInt(analysis.overallScore, 10) || 0 : 0);
+          analysis.fallback = false;
+        } catch (parseError) {
+          console.error('Error parsing OpenAI response:', parseError);
+          console.log('Raw response that failed to parse:', analysisText);
           
-          // Get the messages from the thread
-          const messagesResponse = await fetch(`https://api.openai.com/v1/threads/${threadId}/messages`, {
-            headers: {
-              'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-              'OpenAI-Beta': 'assistants=v1'
-            }
-          });
-          
-          if (!messagesResponse.ok) {
-            const errorData = await messagesResponse.text();
-            console.error('Error getting messages:', errorData);
-            throw new Error(`Failed to get messages: ${messagesResponse.statusText}`);
-          }
-          
-          const messagesData = await messagesResponse.json();
-          const assistantMessages = messagesData.data.filter(msg => msg.role === 'assistant');
-          
-          if (assistantMessages.length === 0) {
-            throw new Error('No assistant messages found');
-          }
-          
-          const analysisText = assistantMessages[0].content[0].text.value;
-          console.log(`Received analysis from OpenAI: ${analysisText.substring(0, 200)}...`);
-          
-          // Parse the JSON from the assistant's message
-          let analysis;
-          try {
-            // Clean the response to ensure it's valid JSON
-            const cleanedText = analysisText.trim()
-              .replace(/```json/g, '')  // Remove markdown code blocks if present
-              .replace(/```/g, '')      // Remove closing code blocks
-              .trim();
-              
-            analysis = JSON.parse(cleanedText);
-            console.log("Successfully parsed analysis result as JSON from PDF");
-          } catch (parseError) {
-            console.error('Error parsing assistant response:', parseError);
-            throw new Error(`Failed to parse analysis result: ${parseError.message}`);
-          }
-          
-          // Clean up
-          try {
-            // Delete the assistant
-            const deleteAssistantResponse = await fetch(`https://api.openai.com/v1/assistants/${assistantId}`, {
-              method: 'DELETE',
-              headers: {
-                'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-                'OpenAI-Beta': 'assistants=v1'
-              }
-            });
-            
-            if (deleteAssistantResponse.ok) {
-              console.log(`Successfully deleted assistant ${assistantId}`);
-            } else {
-              console.warn(`Failed to delete assistant ${assistantId}: ${deleteAssistantResponse.statusText}`);
-            }
-            
-            // Delete the file from OpenAI
-            const deleteFileResponse = await fetch(`https://api.openai.com/v1/files/${fileId}`, {
-              method: 'DELETE',
-              headers: {
-                'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`
-              }
-            });
-            
-            if (deleteFileResponse.ok) {
-              console.log(`Successfully deleted file ${fileId} from OpenAI`);
-            } else {
-              console.warn(`Failed to delete file ${fileId}: ${deleteFileResponse.statusText}`);
-            }
-          } catch (deleteError) {
-            console.warn(`Error during cleanup:`, deleteError);
-          }
-          
-          // Store analysis in database and return response
-          if (analysis) {
-            // Ensure all required fields exist
-            analysis.educationLevel = analysis.educationLevel || "Not available";
-            analysis.yearsExperience = analysis.yearsExperience || "Not available";
-            analysis.skillsMatch = analysis.skillsMatch || "Low";
-            analysis.keySkills = analysis.keySkills || [];
-            analysis.missingRequirements = analysis.missingRequirements || [];
-            analysis.overallScore = typeof analysis.overallScore === 'number' ? 
-              analysis.overallScore : 
-              (typeof analysis.overallScore === 'string' ? parseInt(analysis.overallScore, 10) || 0 : 0);
-            analysis.fallback = false;
-            
-            // Store in database if we have job and application IDs
-            if (jobId && applicantId) {
-              await storeAnalysisInDatabase(jobId, applicantId, analysis, forceUpdate);
-            }
-            
-            return new Response(
-              JSON.stringify(analysis),
-              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-          }
-        } finally {
-          // Cleanup code already included in the try block above
+          // Provide a fallback analysis if parsing fails
+          analysis = {
+            educationLevel: "Not available",
+            yearsExperience: "Not available",
+            skillsMatch: "Low",
+            keySkills: ["Failed to extract skills from resume"],
+            missingRequirements: ["Failed to analyze resume against job requirements"],
+            overallScore: 0,
+            fallback: true,
+            debugInfo: `Failed to parse OpenAI response. Response started with: ${analysisText.substring(0, 100)}`
+          };
         }
+        
+        // Store analysis in database if we have job and application IDs
+        if (jobId && applicantId) {
+          await storeAnalysisInDatabase(jobId, applicantId, analysis, forceUpdate);
+        }
+        
+        return new Response(
+          JSON.stringify(analysis),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       } else {
         // For text-based resumes, use the regular chat completions API
         const userPrompt = `Analyze how well the following resume matches the job description:
@@ -467,6 +324,8 @@ serve(async (req) => {
           "missingRequirements": ["Array of key requirements from job description not found in resume"],
           "overallScore": "A score from 0-100 representing overall match percentage"
         }`;
+        
+        console.log("Sending request to OpenAI");
         
         // Send the prompt to OpenAI for analysis
         openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
