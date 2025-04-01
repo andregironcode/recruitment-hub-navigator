@@ -1,17 +1,20 @@
 
 import React, { useState, useEffect } from "react";
-import { getApplicationsByJobId } from "@/services/jobService";
+import { getApplicationsByJobId, updateApplicationStatus } from "@/services/jobService";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { FileText, Mail, Phone, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface JobApplicantsProps {
   jobId: number;
   jobTitle: string;
   onBack: () => void;
 }
+
+type ApplicationStatus = "new" | "reviewed" | "interviewing" | "rejected" | "offered" | "hired";
 
 interface Applicant {
   id: number;
@@ -22,9 +25,13 @@ interface Applicant {
   phone: string;
   resumeUrl: string;
   coverLetter: string;
-  status: "new" | "reviewed" | "interviewing" | "rejected" | "offered" | "hired";
+  status: ApplicationStatus;
   dateApplied: string;
 }
+
+const isValidStatus = (status: string): status is ApplicationStatus => {
+  return ['new', 'reviewed', 'interviewing', 'rejected', 'offered', 'hired'].includes(status);
+};
 
 const JobApplicants = ({ jobId, jobTitle, onBack }: JobApplicantsProps) => {
   const [applicants, setApplicants] = useState<Applicant[]>([]);
@@ -36,8 +43,14 @@ const JobApplicants = ({ jobId, jobTitle, onBack }: JobApplicantsProps) => {
       setLoading(true);
       try {
         const data = await getApplicationsByJobId(jobId);
-        setApplicants(data);
-        console.log("Loaded applicants for job:", data);
+        // Map and validate the status field
+        const validatedApplicants = data.map(app => ({
+          ...app,
+          // Use type guarding to ensure we have a valid status
+          status: isValidStatus(app.status) ? app.status : 'new' as ApplicationStatus
+        }));
+        setApplicants(validatedApplicants);
+        console.log("Loaded applicants for job:", validatedApplicants);
       } catch (error) {
         console.error("Error loading applicants:", error);
         toast({
@@ -52,6 +65,28 @@ const JobApplicants = ({ jobId, jobTitle, onBack }: JobApplicantsProps) => {
 
     loadApplicants();
   }, [jobId, toast]);
+
+  const handleStatusChange = async (id: number, newStatus: ApplicationStatus) => {
+    try {
+      await updateApplicationStatus(id, newStatus);
+      setApplicants(current => 
+        current.map(app => 
+          app.id === id ? { ...app, status: newStatus } : app
+        )
+      );
+      toast({
+        title: "Status Updated",
+        description: "Application status has been updated successfully"
+      });
+    } catch (error) {
+      console.error("Error updating status:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update application status",
+        variant: "destructive"
+      });
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch(status) {
@@ -91,6 +126,7 @@ const JobApplicants = ({ jobId, jobTitle, onBack }: JobApplicantsProps) => {
                 <TableHead>Date Applied</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Resume</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -128,6 +164,28 @@ const JobApplicants = ({ jobId, jobTitle, onBack }: JobApplicantsProps) => {
                     ) : (
                       <span className="text-sm text-muted-foreground">No resume</span>
                     )}
+                  </TableCell>
+                  <TableCell>
+                    <Select 
+                      value={applicant.status} 
+                      onValueChange={(value: string) => {
+                        if (isValidStatus(value)) {
+                          handleStatusChange(applicant.id, value);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-[130px]">
+                        <SelectValue placeholder="Change status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="new">New</SelectItem>
+                        <SelectItem value="reviewed">Reviewed</SelectItem>
+                        <SelectItem value="interviewing">Interviewing</SelectItem>
+                        <SelectItem value="rejected">Rejected</SelectItem>
+                        <SelectItem value="offered">Offered</SelectItem>
+                        <SelectItem value="hired">Hired</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </TableCell>
                 </TableRow>
               ))}
