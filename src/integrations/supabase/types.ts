@@ -14,6 +14,7 @@ export type Database = {
           analyzed_at: string | null
           application_id: number
           education_level: string | null
+          fallback: boolean | null
           id: number
           job_id: number
           key_skills: string[] | null
@@ -26,6 +27,7 @@ export type Database = {
           analyzed_at?: string | null
           application_id: number
           education_level?: string | null
+          fallback?: boolean | null
           id?: number
           job_id: number
           key_skills?: string[] | null
@@ -38,6 +40,7 @@ export type Database = {
           analyzed_at?: string | null
           application_id?: number
           education_level?: string | null
+          fallback?: boolean | null
           id?: number
           job_id?: number
           key_skills?: string[] | null
