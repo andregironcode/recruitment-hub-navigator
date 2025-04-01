@@ -144,7 +144,9 @@ const JobSearch: React.FC<JobSearchProps> = ({ onSearch }) => {
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
                 {categories.map(category => (
-                  <SelectItem key={category.id} value={category.name}>{category.name}</SelectItem>
+                  <SelectItem key={category.id} value={category.name}>
+                    {category.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
