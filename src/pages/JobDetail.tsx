@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -100,34 +99,23 @@ const JobDetail = () => {
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
       const filePath = `resumes/${fileName}`;
 
-      // Check if storage bucket exists, create if not
+      // Check if storage bucket exists first
       const { data: buckets } = await supabase.storage.listBuckets();
-      const resumeBucket = buckets?.find(b => b.name === 'resumes');
+      console.log('Available buckets:', buckets);
       
-      if (!resumeBucket) {
-        console.log('Resume bucket not found, creating...');
-        const { error: createError } = await supabase.storage.createBucket('resumes', {
-          public: false,
-          fileSizeLimit: 10485760, // 10MB
-        });
-        
-        if (createError) {
-          console.error('Error creating bucket:', createError);
-          throw new Error('Failed to create storage bucket');
-        }
-        console.log('Bucket created successfully');
-      }
-
-      // Upload file
+      // Directly attempt to upload the file without creating a bucket
       console.log('Uploading file to', filePath);
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError, data: uploadData } = await supabase.storage
         .from('resumes')
         .upload(filePath, file);
 
       if (uploadError) {
         console.error('Error uploading file:', uploadError);
         
-        // Special handling for specific error codes
+        if (uploadError.message.includes('The resource was not found')) {
+          throw new Error('Storage bucket "resumes" not found. Please contact an administrator.');
+        }
+        
         if (uploadError.message.includes('row-level security policy')) {
           throw new Error('Permission denied: Cannot upload file due to security restrictions. Please contact an administrator.');
         }
@@ -135,18 +123,21 @@ const JobDetail = () => {
         throw new Error('Failed to upload resume: ' + uploadError.message);
       }
 
-      // Get URL for the uploaded file
-      console.log('Getting signed URL for file');
-      const { data: urlData } = await supabase.storage
-        .from('resumes')
-        .createSignedUrl(filePath, 60 * 60 * 24 * 30); // 30 days expiry
+      if (!uploadData) {
+        throw new Error('Upload failed - no data returned from server');
+      }
 
-      if (!urlData || !urlData.signedUrl) {
+      // Get a public URL for the file
+      const { data: publicUrlData } = supabase.storage
+        .from('resumes')
+        .getPublicUrl(filePath);
+
+      if (!publicUrlData || !publicUrlData.publicUrl) {
         throw new Error('Failed to get resume URL');
       }
 
-      console.log('File uploaded successfully, URL obtained');
-      return urlData.signedUrl;
+      console.log('File uploaded successfully, URL obtained:', publicUrlData.publicUrl);
+      return publicUrlData.publicUrl;
     } catch (error) {
       console.error('File upload error:', error);
       toast({
