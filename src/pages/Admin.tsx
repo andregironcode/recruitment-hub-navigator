@@ -7,7 +7,7 @@ import {
   updateApplicationStatus 
 } from "@/services/jobService";
 
-// Update the Application interface to ensure status is properly typed
+// Ensure the Application interface is properly typed
 interface Application {
   id: number;
   jobId: number;
@@ -27,7 +27,6 @@ const Admin = () => {
   const [applicationsLoading, setApplicationsLoading] = useState<boolean>(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  // In the getAllApplications function, make sure to properly map the status to match the type
   const loadApplications = async () => {
     setApplicationsLoading(true);
     try {
