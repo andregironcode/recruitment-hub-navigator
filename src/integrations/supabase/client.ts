@@ -63,8 +63,15 @@ export const checkStorageBuckets = async () => {
         
         if (!error) {
           console.log('Successfully accessed bucket directly');
-          // Create a placeholder bucket info if direct access works
-          resumesBucket = { id: RESUME_BUCKET_ID, name: 'Resumes Storage' };
+          // Create a placeholder bucket info if direct access works with all required properties
+          resumesBucket = { 
+            id: RESUME_BUCKET_ID, 
+            name: 'Resumes Storage',
+            owner: '',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            public: true
+          };
         } else {
           console.warn('Could not access bucket directly:', error);
           
@@ -108,7 +115,7 @@ export const checkStorageBuckets = async () => {
 };
 
 // Helper function to upload a file to the resumes bucket
-export const uploadResumeFile = async (file: File): Promise<{ url?: string; error?: Error }> => {
+export const uploadResumeFile = async (file: File): Promise<{ url?: string; error?: Error; content?: string }> => {
   try {
     // Check if the bucket is accessible first
     const bucketCheck = await checkStorageBuckets();
@@ -121,6 +128,26 @@ export const uploadResumeFile = async (file: File): Promise<{ url?: string; erro
     const filePath = fileName;
     
     console.log(`Uploading file to ${RESUME_BUCKET_ID} bucket: ${filePath}`);
+    
+    // Extract text content from the file if possible
+    let fileContent: string | undefined;
+    
+    try {
+      if (file.type === 'application/pdf') {
+        console.log('PDF file detected. Text extraction might be limited in client-side code.');
+        // For PDFs, we'll rely on server-side extraction
+      } else if (file.type.includes('text') || file.type === 'application/rtf') {
+        // If it's a text file, we can extract the content
+        fileContent = await file.text();
+        console.log('Successfully extracted text from file. First 100 chars:', fileContent.substring(0, 100));
+      } else if (file.type.includes('word') || file.type.includes('officedocument')) {
+        console.log('Word document detected. Text extraction will be handled server-side.');
+        // For Word docs, we'll rely on server-side extraction
+      }
+    } catch (textExtractionError) {
+      console.warn('Error extracting text from file:', textExtractionError);
+      // Continue with upload even if text extraction fails
+    }
     
     const { error: uploadError, data: uploadData } = await supabase.storage
       .from(RESUME_BUCKET_ID)
@@ -147,7 +174,10 @@ export const uploadResumeFile = async (file: File): Promise<{ url?: string; erro
     }
 
     console.log('File uploaded successfully, URL obtained:', publicUrlData.publicUrl);
-    return { url: publicUrlData.publicUrl };
+    return { 
+      url: publicUrlData.publicUrl,
+      content: fileContent 
+    };
   } catch (error) {
     console.error('File upload error:', error);
     return { error: error instanceof Error ? error : new Error('An unknown error occurred during file upload') };

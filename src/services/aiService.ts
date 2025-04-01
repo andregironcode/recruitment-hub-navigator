@@ -27,7 +27,13 @@ export async function analyzeResume({
   applicantId
 }: ResumeAnalysisParams): Promise<ResumeAnalysis> {
   try {
-    console.log('Analyzing resume with params:', { resumeUrl: resumeUrl?.substring(0, 50), jobId, applicantId });
+    console.log('Analyzing resume with params:', { 
+      resumeUrl: resumeUrl?.substring(0, 50), 
+      contentProvided: !!resumeContent, 
+      contentLength: resumeContent ? resumeContent.length : 0,
+      jobId, 
+      applicantId 
+    });
     
     const response = await fetch(
       'https://rtuzdeaxmpikwuvplcbh.supabase.co/functions/v1/analyze-resume',

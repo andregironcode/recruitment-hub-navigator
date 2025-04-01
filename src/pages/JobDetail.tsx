@@ -121,6 +121,8 @@ const JobDetail = () => {
     
     try {
       let resumeUrl = '';
+      let resumeContent = '';
+      
       if (cvFile) {
         try {
           setFileUploading(true);
@@ -133,6 +135,11 @@ const JobDetail = () => {
           if (uploadResult.url) {
             resumeUrl = uploadResult.url;
             console.log('Uploaded CV file:', resumeUrl);
+          }
+          
+          if (uploadResult.content) {
+            resumeContent = uploadResult.content;
+            console.log('Extracted content from CV, length:', resumeContent.length);
           }
           
           setFileUploading(false);
@@ -155,6 +162,7 @@ const JobDetail = () => {
         email: applicationData.email,
         phone: applicationData.phone,
         resumeUrl,
+        resumeContent,
         coverLetter: applicationData.coverLetter
       });
       

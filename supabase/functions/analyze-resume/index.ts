@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -39,6 +40,7 @@ serve(async (req) => {
       let resumeText = "Could not extract resume text.";
       
       if (resumeContent) {
+        console.log("Using provided resume content directly, length:", resumeContent.length);
         resumeText = resumeContent;
       } else if (resumeUrl) {
         try {

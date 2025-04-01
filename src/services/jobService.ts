@@ -339,34 +339,84 @@ export const updateApplicationStatus = async (id: number, status: string): Promi
 /**
  * Submit job application
  */
-export const submitApplication = async (application: {
-  jobId: number,
-  jobTitle: string,
-  applicantName: string,
-  email: string,
-  phone?: string,
-  resumeUrl?: string,
-  coverLetter?: string
-}): Promise<void> => {
-  const { error } = await supabase
-    .from('applications')
-    .insert({
-      job_id: application.jobId,
-      job_title: application.jobTitle,
-      applicant_name: application.applicantName,
-      email: application.email,
-      phone: application.phone || null,
-      resume_url: application.resumeUrl || null,
-      cover_letter: application.coverLetter || null,
-      status: 'new',
-      date_applied: new Date().toISOString()
-    });
+export async function submitApplication({
+  jobId,
+  jobTitle,
+  applicantName,
+  email,
+  phone = '',
+  resumeUrl = '',
+  resumeContent = '',
+  coverLetter = ''
+}: ApplicationSubmission): Promise<number> {
+  try {
+    console.log('Submitting application with resume content length:', resumeContent?.length || 0);
+    
+    // Insert the application
+    const { data: applicationData, error: applicationError } = await supabase
+      .from('applications')
+      .insert({
+        job_id: jobId,
+        job_title: jobTitle,
+        applicant_name: applicantName,
+        email: email,
+        phone: phone,
+        resume_url: resumeUrl,
+        cover_letter: coverLetter,
+        status: 'new'
+      })
+      .select()
+      .single();
 
-  if (error) {
-    console.error('Error submitting application:', error);
-    throw new Error('Failed to submit application');
+    if (applicationError) {
+      console.error('Error submitting application:', applicationError);
+      throw new Error(`Failed to submit application: ${applicationError.message}`);
+    }
+
+    if (!applicationData) {
+      throw new Error('Application submission failed - no data returned from server');
+    }
+
+    const applicationId = applicationData.id;
+    
+    // If we have a job description and resume content, try to analyze the resume
+    if (resumeUrl || resumeContent) {
+      try {
+        // Get the job description to use for analysis
+        const { data: jobData, error: jobError } = await supabase
+          .from('jobs')
+          .select('description')
+          .eq('id', jobId)
+          .single();
+
+        if (!jobError && jobData?.description) {
+          console.log('Got job description, sending for AI analysis');
+          
+          // Analyze the resume asynchronously without waiting for result
+          // This allows the application to be submitted even if analysis fails
+          analyzeResume({
+            resumeUrl,
+            resumeContent,
+            jobDescription: jobData.description,
+            jobId,
+            applicantId: applicationId
+          }).catch(error => {
+            console.error('Resume analysis failed:', error);
+            // Analysis errors don't block application submission
+          });
+        }
+      } catch (analysisError) {
+        console.error('Error setting up resume analysis:', analysisError);
+        // Analysis errors don't block application submission
+      }
+    }
+
+    return applicationId;
+  } catch (error) {
+    console.error('Error in submitApplication:', error);
+    throw error;
   }
-};
+}
 
 /**
  * Delete job application
