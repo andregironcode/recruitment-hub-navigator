@@ -28,6 +28,11 @@ const Jobs = () => {
       setFilters(prev => ({ ...prev, industry }));
     }
     
+    const jobType = queryParams.get('jobType');
+    if (jobType) {
+      setFilters(prev => ({ ...prev, jobType }));
+    }
+    
     loadJobs();
   }, [location.search]);
   

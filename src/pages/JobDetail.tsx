@@ -12,7 +12,8 @@ import {
   Building, 
   Share, 
   ArrowLeft,
-  Send
+  Send,
+  FileUp
 } from 'lucide-react';
 import { getJobById } from '@/services/jobService';
 import { Job } from '@/components/jobs/JobList';
@@ -41,6 +42,7 @@ const JobDetail = () => {
     phone: '',
     coverLetter: ''
   });
+  const [cvFile, setCvFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -79,6 +81,12 @@ const JobDetail = () => {
     setApplicationData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setCvFile(e.target.files[0]);
+    }
+  };
+
   const handleApply = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -88,6 +96,7 @@ const JobDetail = () => {
     
     try {
       // Here we would normally submit the application to the backend
+      // including the CV file upload
       // For now, we'll just simulate a successful submission
       await new Promise(resolve => setTimeout(resolve, 1000));
       
@@ -103,6 +112,7 @@ const JobDetail = () => {
         phone: '',
         coverLetter: ''
       });
+      setCvFile(null);
     } catch (error) {
       console.error('Error submitting application:', error);
       toast({
@@ -288,6 +298,28 @@ const JobDetail = () => {
                 value={applicationData.phone}
                 onChange={handleInputChange}
               />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="cv">CV/Resume</Label>
+              <div className="flex items-center gap-2">
+                <Input 
+                  id="cv" 
+                  name="cv"
+                  type="file"
+                  accept=".pdf,.doc,.docx"
+                  onChange={handleFileChange}
+                  className="flex-1"
+                />
+                {cvFile && (
+                  <Badge variant="outline" className="flex items-center gap-1">
+                    <FileUp size={12} /> {cvFile.name.length > 20 ? `${cvFile.name.substring(0, 17)}...` : cvFile.name}
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Accepted formats: PDF, DOC, DOCX (Max 5MB)
+              </p>
             </div>
             
             <div className="space-y-2">
