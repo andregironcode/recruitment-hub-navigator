@@ -65,7 +65,7 @@ export default {
 				},
 				// Custom recruitment colors
 				recruitment: {
-					primary: '#4e1a3d',    // Updated from deep blue to purple
+					primary: '#4e1a3d',    // Deep purple
 					secondary: '#6495ED',  // Cornflower blue
 					light: '#F5F5F5',      // Light gray background
 					dark: '#333333',       // Dark text

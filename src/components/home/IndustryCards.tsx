@@ -45,24 +45,24 @@ const industriesData = [
 
 const IndustryCards = () => {
   return (
-    <section className="py-16 bg-recruitment-light">
+    <section className="py-12 md:py-16 bg-recruitment-light">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 className="text-3xl font-bold text-center mb-12 text-recruitment-dark">
+        <h2 className="text-2xl md:text-3xl font-bold text-center mb-8 md:mb-12 text-recruitment-primary">
           Our Specialist Sectors
         </h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           {industriesData.map((industry) => (
-            <Link to={`/jobs?industry=${industry.id}`} key={industry.id}>
-              <Card className="h-full transition-all duration-300 hover:shadow-md hover:border-recruitment-primary">
-                <CardContent className="p-6">
-                  <h3 className="text-xl font-semibold mb-2 text-recruitment-primary">
+            <Link to={`/jobs?industry=${industry.id}`} key={industry.id} className="h-full">
+              <Card className="h-full transition-all duration-300 hover:shadow-md hover:border-recruitment-primary border-2 border-transparent">
+                <CardContent className="p-4 md:p-6 h-full flex flex-col">
+                  <h3 className="text-lg md:text-xl font-semibold mb-2 text-recruitment-primary">
                     {industry.name}
                   </h3>
-                  <p className="text-gray-600 mb-4">
+                  <p className="text-gray-600 mb-4 flex-grow">
                     {industry.description}
                   </p>
-                  <div className="flex justify-between items-center text-recruitment-secondary">
+                  <div className="flex justify-between items-center text-recruitment-accent mt-auto">
                     <span className="font-medium">{industry.jobCount} openings</span>
                     <ArrowRight size={20} />
                   </div>

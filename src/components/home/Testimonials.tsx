@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const testimonialsData = [
   {
@@ -24,24 +25,28 @@ const testimonialsData = [
 ];
 
 const Testimonials = () => {
+  const isMobile = useIsMobile();
+
   return (
-    <section className="py-16 bg-recruitment-primary text-white">
+    <section className="py-12 md:py-16 bg-gradient-to-r from-recruitment-primary to-recruitment-secondary text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 className="text-3xl font-bold text-center mb-12">
+        <h2 className="text-2xl md:text-3xl font-bold text-center mb-8 md:mb-12">
           What Our Clients Say
         </h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {testimonialsData.map((testimonial) => (
-            <Card key={testimonial.id} className="bg-white/10 border-none shadow-none">
-              <CardContent className="p-6">
-                <div className="text-3xl font-serif mb-4">"</div>
-                <p className="text-white/90 mb-6 italic">
-                  {testimonial.quote}
+            <Card key={testimonial.id} className="bg-white/10 border-none shadow-none backdrop-blur-sm">
+              <CardContent className="p-4 md:p-6">
+                <div className="text-3xl font-serif mb-3 md:mb-4">"</div>
+                <p className="text-white/90 mb-4 md:mb-6 italic text-sm md:text-base">
+                  {isMobile 
+                    ? testimonial.quote.split('.')[0] + '...' 
+                    : testimonial.quote}
                 </p>
                 <div>
                   <h4 className="font-semibold">{testimonial.author}</h4>
-                  <p className="text-white/70 text-sm">{testimonial.position}</p>
+                  <p className="text-white/70 text-xs md:text-sm">{testimonial.position}</p>
                 </div>
               </CardContent>
             </Card>
