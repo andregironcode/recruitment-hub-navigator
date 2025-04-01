@@ -121,9 +121,9 @@ serve(async (req) => {
     } catch (aiError) {
       console.error("AI analysis error:", aiError);
       
-      // Instead of creating fallback data, return an error response
+      // Return an error response
       return new Response(
-        JSON.stringify({ error: "AI analysis failed. Please check your OpenAI API key quota." }),
+        JSON.stringify({ error: "AI analysis failed: " + aiError.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -132,7 +132,7 @@ serve(async (req) => {
     
     // Return an error response
     return new Response(
-      JSON.stringify({ error: "Function failed. Please try again later." }),
+      JSON.stringify({ error: "Function failed: " + error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
