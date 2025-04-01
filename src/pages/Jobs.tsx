@@ -39,7 +39,11 @@ const Jobs = () => {
       setJobs(allJobs);
       
       // Apply filters if they exist
-      if (filters.industry || filters.jobType || filters.keyword || filters.location) {
+      if ((filters.industry && filters.industry !== 'all') || 
+          (filters.jobType && filters.jobType !== 'all') || 
+          filters.keyword || 
+          filters.location || 
+          (filters.category && filters.category !== 'all')) {
         handleSearch(filters);
       }
     } catch (error) {
@@ -59,8 +63,24 @@ const Jobs = () => {
     setFilters(searchFilters);
     
     try {
-      const filteredJobs = await filterJobs(searchFilters);
-      setJobs(filteredJobs);
+      // If all filters are either empty or 'all', load all jobs
+      if ((!searchFilters.industry || searchFilters.industry === 'all') && 
+          (!searchFilters.jobType || searchFilters.jobType === 'all') && 
+          !searchFilters.keyword && 
+          !searchFilters.location &&
+          (!searchFilters.category || searchFilters.category === 'all')) {
+        const allJobs = await getAllJobs();
+        setJobs(allJobs);
+      } else {
+        // Clean up filters - convert 'all' to empty string for backend filtering
+        const cleanedFilters = { ...searchFilters };
+        if (cleanedFilters.industry === 'all') cleanedFilters.industry = '';
+        if (cleanedFilters.jobType === 'all') cleanedFilters.jobType = '';
+        if (cleanedFilters.category === 'all') cleanedFilters.category = '';
+        
+        const filteredJobs = await filterJobs(cleanedFilters);
+        setJobs(filteredJobs);
+      }
     } catch (error) {
       console.error('Error filtering jobs:', error);
       toast({
@@ -94,7 +114,9 @@ const Jobs = () => {
               </h2>
               {!loading && jobs.length > 0 && (
                 <div className="text-sm text-gray-500">
-                  {filters.industry ? `Filtered by ${filters.industry}` : 'Showing all industries'}
+                  {filters.industry && filters.industry !== 'all' 
+                    ? `Filtered by ${filters.industry}` 
+                    : 'Showing all industries'}
                 </div>
               )}
             </div>

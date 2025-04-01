@@ -97,7 +97,7 @@ const JobSearch: React.FC<JobSearchProps> = ({ onSearch }) => {
                 <SelectValue placeholder="All Industries" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Industries</SelectItem>
+                <SelectItem value="all">All Industries</SelectItem>
                 <SelectItem value="Technology">Technology</SelectItem>
                 <SelectItem value="Finance">Finance</SelectItem>
                 <SelectItem value="Healthcare">Healthcare</SelectItem>
@@ -120,7 +120,7 @@ const JobSearch: React.FC<JobSearchProps> = ({ onSearch }) => {
                 <SelectValue placeholder="All Types" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Types</SelectItem>
+                <SelectItem value="all">All Types</SelectItem>
                 <SelectItem value="Full-Time">Full-Time</SelectItem>
                 <SelectItem value="Part-Time">Part-Time</SelectItem>
                 <SelectItem value="Contract">Contract</SelectItem>
@@ -142,7 +142,7 @@ const JobSearch: React.FC<JobSearchProps> = ({ onSearch }) => {
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Categories</SelectItem>
+                <SelectItem value="all">All Categories</SelectItem>
                 {categories.map(category => (
                   <SelectItem key={category.id} value={category.name}>{category.name}</SelectItem>
                 ))}
