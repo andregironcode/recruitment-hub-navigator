@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -49,10 +48,16 @@ import {
   Tag,
   Mail,
   User,
-  FileText
+  FileText,
+  Search,
+  Filter
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Job } from '@/components/jobs/JobList';
+import { Form, FormField, FormItem, FormLabel, FormControl } from '@/components/ui/form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import * as z from 'zod';
 import { 
   getAllJobs, 
   addJob, 
@@ -87,9 +92,27 @@ interface Category {
   jobCount: number;
 }
 
+// Job filters schema
+const jobFiltersSchema = z.object({
+  searchTerm: z.string().optional(),
+  jobType: z.string().optional(),
+  industry: z.string().optional(),
+  featured: z.string().optional(),
+  category: z.string().optional(),
+});
+
+// Application filters schema
+const applicationFiltersSchema = z.object({
+  searchTerm: z.string().optional(),
+  status: z.string().optional(),
+  dateRange: z.string().optional(),
+});
+
 const Admin = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [filteredJobs, setFilteredJobs] = useState<Job[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
+  const [filteredApplications, setFilteredApplications] = useState<Application[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -117,7 +140,29 @@ const Admin = () => {
   const [categoryToDelete, setCategoryToDelete] = useState<number | null>(null);
   const [applicationViewOpen, setApplicationViewOpen] = useState(false);
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
+  const [jobFiltersOpen, setJobFiltersOpen] = useState(false);
+  const [applicationFiltersOpen, setApplicationFiltersOpen] = useState(false);
   const { toast } = useToast();
+  
+  const jobFiltersForm = useForm<z.infer<typeof jobFiltersSchema>>({
+    resolver: zodResolver(jobFiltersSchema),
+    defaultValues: {
+      searchTerm: '',
+      jobType: '',
+      industry: '',
+      featured: '',
+      category: '',
+    },
+  });
+
+  const applicationFiltersForm = useForm<z.infer<typeof applicationFiltersSchema>>({
+    resolver: zodResolver(applicationFiltersSchema),
+    defaultValues: {
+      searchTerm: '',
+      status: '',
+      dateRange: '',
+    },
+  });
   
   // Simplified mock login for demo purposes
   const [credentials, setCredentials] = useState({
@@ -138,6 +183,7 @@ const Admin = () => {
     try {
       const jobsData = await getAllJobs();
       setJobs(jobsData);
+      setFilteredJobs(jobsData);
     } catch (error) {
       console.error('Error loading jobs:', error);
       toast({
@@ -168,6 +214,7 @@ const Admin = () => {
     try {
       const applicationsData = await getAllApplications();
       setApplications(applicationsData);
+      setFilteredApplications(applicationsData);
     } catch (error) {
       console.error('Error loading applications:', error);
       toast({
@@ -437,6 +484,77 @@ const Admin = () => {
     }
   };
 
+  // Filter jobs
+  const filterJobs = (values: z.infer<typeof jobFiltersSchema>) => {
+    let filtered = [...jobs];
+    
+    if (values.searchTerm) {
+      const term = values.searchTerm.toLowerCase();
+      filtered = filtered.filter(job => 
+        job.title.toLowerCase().includes(term) || 
+        job.company.toLowerCase().includes(term) ||
+        job.description.toLowerCase().includes(term)
+      );
+    }
+    
+    if (values.jobType) {
+      filtered = filtered.filter(job => job.jobType === values.jobType);
+    }
+    
+    if (values.industry) {
+      filtered = filtered.filter(job => job.industry === values.industry);
+    }
+    
+    if (values.featured === 'true') {
+      filtered = filtered.filter(job => job.featured);
+    } else if (values.featured === 'false') {
+      filtered = filtered.filter(job => !job.featured);
+    }
+    
+    if (values.category) {
+      filtered = filtered.filter(job => job.category === values.category);
+    }
+    
+    setFilteredJobs(filtered);
+    setJobFiltersOpen(false);
+  };
+
+  // Filter applications
+  const filterApplications = (values: z.infer<typeof applicationFiltersSchema>) => {
+    let filtered = [...applications];
+    
+    if (values.searchTerm) {
+      const term = values.searchTerm.toLowerCase();
+      filtered = filtered.filter(app => 
+        app.applicantName.toLowerCase().includes(term) || 
+        app.jobTitle.toLowerCase().includes(term) ||
+        app.email.toLowerCase().includes(term)
+      );
+    }
+    
+    if (values.status) {
+      filtered = filtered.filter(app => app.status === values.status);
+    }
+    
+    // Date range filtering would be implemented here
+    
+    setFilteredApplications(filtered);
+    setApplicationFiltersOpen(false);
+  };
+
+  // Reset filters
+  const resetJobFilters = () => {
+    jobFiltersForm.reset();
+    setFilteredJobs(jobs);
+    setJobFiltersOpen(false);
+  };
+
+  const resetApplicationFilters = () => {
+    applicationFiltersForm.reset();
+    setFilteredApplications(applications);
+    setApplicationFiltersOpen(false);
+  };
+
   // Admin login form
   if (!isAuthenticated) {
     return (
@@ -521,9 +639,18 @@ const Admin = () => {
             <TabsContent value="jobs">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-semibold text-recruitment-dark">Manage Jobs</h2>
-                <Button onClick={openAddDialog} className="bg-recruitment-primary hover:bg-recruitment-primary/90">
-                  <Plus className="mr-2 h-4 w-4" /> Add New Job
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setJobFiltersOpen(true)}
+                    className="flex items-center gap-2"
+                  >
+                    <Filter className="h-4 w-4" /> Filter
+                  </Button>
+                  <Button onClick={openAddDialog} className="bg-recruitment-primary hover:bg-recruitment-primary/90">
+                    <Plus className="mr-2 h-4 w-4" /> Add New Job
+                  </Button>
+                </div>
               </div>
               
               {loading ? (
@@ -547,7 +674,7 @@ const Admin = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {jobs.map((job) => (
+                      {filteredJobs.map((job) => (
                         <TableRow key={job.id}>
                           <TableCell className="font-medium">{job.title}</TableCell>
                           <TableCell>{job.company}</TableCell>
@@ -581,7 +708,7 @@ const Admin = () => {
                           </TableCell>
                         </TableRow>
                       ))}
-                      {jobs.length === 0 && (
+                      {filteredJobs.length === 0 && (
                         <TableRow>
                           <TableCell colSpan={7} className="text-center py-4 text-gray-500">
                             No jobs found. Add your first job!
@@ -597,6 +724,13 @@ const Admin = () => {
             <TabsContent value="applications">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-semibold text-recruitment-dark">Job Applications</h2>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setApplicationFiltersOpen(true)}
+                  className="flex items-center gap-2"
+                >
+                  <Filter className="h-4 w-4" /> Filter
+                </Button>
               </div>
               
               <div className="bg-white rounded-lg overflow-hidden">
@@ -611,7 +745,7 @@ const Admin = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {applications.map((application) => (
+                    {filteredApplications.map((application) => (
                       <TableRow key={application.id}>
                         <TableCell className="font-medium">{application.applicantName}</TableCell>
                         <TableCell>{application.jobTitle}</TableCell>
@@ -632,7 +766,7 @@ const Admin = () => {
                         </TableCell>
                       </TableRow>
                     ))}
-                    {applications.length === 0 && (
+                    {filteredApplications.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={5} className="text-center py-4 text-gray-500">
                           No applications received yet.
@@ -832,6 +966,26 @@ const Admin = () => {
                 </Select>
               </div>
               
+              <div>
+                <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
+                  Category
+                </label>
+                <Select 
+                  value={editingJob ? editingJob.category || "" : job.category || ""}
+                  onValueChange={(value) => handleInputChange('category', value)}
+                >
+                  <SelectTrigger id="category">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">None</SelectItem>
+                    {categories.map(cat => (
+                      <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
@@ -859,222 +1013,3 @@ const Admin = () => {
               onChange={(e) => handleInputChange('description', e.target.value)}
             />
           </div>
-          
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setOpenDialog(false)}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={editingJob ? handleUpdateJob : handleAddJob}
-              className="bg-recruitment-primary hover:bg-recruitment-primary/90"
-            >
-              <Briefcase className="mr-2 h-4 w-4" />
-              {editingJob ? 'Update Job' : 'Add Job'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add Category Dialog */}
-      <Dialog open={openCategoryDialog} onOpenChange={setOpenCategoryDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New Category</DialogTitle>
-            <DialogDescription>
-              Create a new job category to organize your job listings.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div>
-              <label htmlFor="categoryName" className="block text-sm font-medium text-gray-700 mb-1">
-                Category Name *
-              </label>
-              <Input
-                id="categoryName"
-                placeholder="e.g. Information Technology"
-                value={category.name}
-                onChange={(e) => handleCategoryInputChange('name', e.target.value)}
-              />
-            </div>
-            
-            <div>
-              <label htmlFor="categoryDescription" className="block text-sm font-medium text-gray-700 mb-1">
-                Description *
-              </label>
-              <Textarea
-                id="categoryDescription"
-                placeholder="Brief description of this category..."
-                value={category.description}
-                onChange={(e) => handleCategoryInputChange('description', e.target.value)}
-              />
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setOpenCategoryDialog(false)}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleAddCategory}
-              className="bg-recruitment-primary hover:bg-recruitment-primary/90"
-            >
-              <Tag className="mr-2 h-4 w-4" />
-              Add Category
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      {/* View Application Dialog */}
-      <Dialog open={applicationViewOpen} onOpenChange={setApplicationViewOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Application Details</DialogTitle>
-            <DialogDescription>
-              Review the application and update its status.
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedApplication && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500">Applicant Name</h3>
-                  <p className="mt-1">{selectedApplication.applicantName}</p>
-                </div>
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500">Position</h3>
-                  <p className="mt-1">{selectedApplication.jobTitle}</p>
-                </div>
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500">Email</h3>
-                  <p className="mt-1">{selectedApplication.email}</p>
-                </div>
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500">Phone</h3>
-                  <p className="mt-1">{selectedApplication.phone}</p>
-                </div>
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500">Date Applied</h3>
-                  <p className="mt-1">{selectedApplication.dateApplied}</p>
-                </div>
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500">Status</h3>
-                  <p className="mt-1">
-                    <span className={`px-2 py-1 rounded-full text-xs text-white ${getStatusBadgeColor(selectedApplication.status)}`}>
-                      {selectedApplication.status.charAt(0).toUpperCase() + selectedApplication.status.slice(1)}
-                    </span>
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Cover Letter</h3>
-                <p className="mt-1 text-sm text-gray-600 whitespace-pre-line">{selectedApplication.coverLetter}</p>
-              </div>
-
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Resume</h3>
-                <div className="mt-1">
-                  <Button variant="outline" size="sm" asChild>
-                    <a href={selectedApplication.resumeUrl} target="_blank" rel="noopener noreferrer">
-                      <FileText className="mr-2 h-4 w-4" /> View Resume
-                    </a>
-                  </Button>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Update Status</h3>
-                <div className="flex flex-wrap gap-2">
-                  {(["new", "reviewed", "interviewing", "rejected", "offered", "hired"] as const).map((status) => (
-                    <Button
-                      key={status}
-                      size="sm"
-                      variant={selectedApplication.status === status ? "default" : "outline"}
-                      className={selectedApplication.status === status ? "bg-recruitment-primary hover:bg-recruitment-primary/90" : ""}
-                      onClick={() => handleUpdateApplicationStatus(selectedApplication.id, status)}
-                    >
-                      {status.charAt(0).toUpperCase() + status.slice(1)}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setApplicationViewOpen(false)}
-            >
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      {/* Delete Job Confirmation Dialog */}
-      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirm Deletion</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this job? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setDeleteConfirmOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button 
-              variant="destructive" 
-              onClick={handleDeleteJob}
-            >
-              Delete Job
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Category Confirmation Dialog */}
-      <Dialog open={deleteCategoryConfirmOpen} onOpenChange={setDeleteCategoryConfirmOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirm Category Deletion</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this category? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setDeleteCategoryConfirmOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button 
-              variant="destructive" 
-              onClick={handleDeleteCategory}
-            >
-              Delete Category
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-    </Layout>
-  );
-};
-
-export default Admin;

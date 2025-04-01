@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { 
@@ -10,6 +10,7 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { Search } from 'lucide-react';
+import { getAllCategories } from '@/services/jobService';
 
 interface JobSearchProps {
   onSearch: (filters: JobSearchFilters) => void;
@@ -20,7 +21,7 @@ export interface JobSearchFilters {
   location: string;
   industry: string;
   jobType: string;
-  category?: string; // Adding the category property
+  category?: string;
 }
 
 const JobSearch: React.FC<JobSearchProps> = ({ onSearch }) => {
@@ -30,6 +31,20 @@ const JobSearch: React.FC<JobSearchProps> = ({ onSearch }) => {
     industry: '',
     jobType: ''
   });
+  const [categories, setCategories] = useState<{id: number, name: string}[]>([]);
+  
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const data = await getAllCategories();
+        setCategories(data);
+      } catch (error) {
+        console.error('Error loading categories:', error);
+      }
+    };
+    
+    loadCategories();
+  }, []);
 
   const handleChange = (field: keyof JobSearchFilters, value: string) => {
     setFilters(prev => ({ ...prev, [field]: value }));
@@ -43,7 +58,7 @@ const JobSearch: React.FC<JobSearchProps> = ({ onSearch }) => {
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
       <form onSubmit={handleSubmit}>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <div>
             <label htmlFor="keyword" className="block text-sm font-medium text-gray-700 mb-1">
               Keywords
@@ -82,13 +97,13 @@ const JobSearch: React.FC<JobSearchProps> = ({ onSearch }) => {
                 <SelectValue placeholder="All Industries" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all-industries">All Industries</SelectItem>
-                <SelectItem value="technology">Technology</SelectItem>
-                <SelectItem value="finance">Finance</SelectItem>
-                <SelectItem value="healthcare">Healthcare</SelectItem>
-                <SelectItem value="marketing">Marketing</SelectItem>
-                <SelectItem value="engineering">Engineering</SelectItem>
-                <SelectItem value="retail">Retail</SelectItem>
+                <SelectItem value="">All Industries</SelectItem>
+                <SelectItem value="Technology">Technology</SelectItem>
+                <SelectItem value="Finance">Finance</SelectItem>
+                <SelectItem value="Healthcare">Healthcare</SelectItem>
+                <SelectItem value="Marketing">Marketing</SelectItem>
+                <SelectItem value="Engineering">Engineering</SelectItem>
+                <SelectItem value="Retail">Retail</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -105,12 +120,32 @@ const JobSearch: React.FC<JobSearchProps> = ({ onSearch }) => {
                 <SelectValue placeholder="All Types" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all-types">All Types</SelectItem>
-                <SelectItem value="full-time">Full-Time</SelectItem>
-                <SelectItem value="part-time">Part-Time</SelectItem>
-                <SelectItem value="contract">Contract</SelectItem>
-                <SelectItem value="temporary">Temporary</SelectItem>
-                <SelectItem value="remote">Remote</SelectItem>
+                <SelectItem value="">All Types</SelectItem>
+                <SelectItem value="Full-Time">Full-Time</SelectItem>
+                <SelectItem value="Part-Time">Part-Time</SelectItem>
+                <SelectItem value="Contract">Contract</SelectItem>
+                <SelectItem value="Temporary">Temporary</SelectItem>
+                <SelectItem value="Remote">Remote</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div>
+            <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
+              Category
+            </label>
+            <Select 
+              value={filters.category}
+              onValueChange={(value) => handleChange('category', value)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">All Categories</SelectItem>
+                {categories.map(category => (
+                  <SelectItem key={category.id} value={category.name}>{category.name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

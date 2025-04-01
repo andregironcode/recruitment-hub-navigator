@@ -9,7 +9,116 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      applications: {
+        Row: {
+          applicant_name: string
+          cover_letter: string | null
+          date_applied: string | null
+          email: string
+          id: number
+          job_id: number
+          job_title: string
+          phone: string | null
+          resume_url: string | null
+          status: string | null
+        }
+        Insert: {
+          applicant_name: string
+          cover_letter?: string | null
+          date_applied?: string | null
+          email: string
+          id?: number
+          job_id: number
+          job_title: string
+          phone?: string | null
+          resume_url?: string | null
+          status?: string | null
+        }
+        Update: {
+          applicant_name?: string
+          cover_letter?: string | null
+          date_applied?: string | null
+          email?: string
+          id?: number
+          job_id?: number
+          job_title?: string
+          phone?: string | null
+          resume_url?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "applications_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_categories: {
+        Row: {
+          created_at: string | null
+          description: string
+          id: number
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          description: string
+          id?: number
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string
+          id?: number
+          name?: string
+        }
+        Relationships: []
+      }
+      jobs: {
+        Row: {
+          category: string | null
+          company: string
+          description: string
+          featured: boolean | null
+          id: number
+          industry: string
+          job_type: string
+          location: string
+          posted_date: string | null
+          salary: string | null
+          title: string
+        }
+        Insert: {
+          category?: string | null
+          company: string
+          description: string
+          featured?: boolean | null
+          id?: number
+          industry: string
+          job_type: string
+          location: string
+          posted_date?: string | null
+          salary?: string | null
+          title: string
+        }
+        Update: {
+          category?: string | null
+          company?: string
+          description?: string
+          featured?: boolean | null
+          id?: number
+          industry?: string
+          job_type?: string
+          location?: string
+          posted_date?: string | null
+          salary?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
