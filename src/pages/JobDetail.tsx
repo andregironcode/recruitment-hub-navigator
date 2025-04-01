@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -124,19 +125,12 @@ const JobDetail = () => {
                     )}
                   </div>
 
-                  <div className="mb-8">
+                  <div>
                     <h2 className="text-xl font-semibold mb-4 text-recruitment-dark">Job Description</h2>
                     <div 
                       className="text-gray-600 prose prose-sm max-w-none" 
                       dangerouslySetInnerHTML={{ __html: job.description }}
                     />
-                  </div>
-
-                  <div>
-                    <h2 className="text-xl font-semibold mb-4 text-recruitment-dark">About {job.company}</h2>
-                    <p className="text-gray-600">
-                      {job.company} is a leading organization in the {job.industry.toLowerCase()} sector, known for innovation and excellence. With a passionate team of professionals, we are committed to delivering exceptional results for our clients and creating a supportive work environment for our employees.
-                    </p>
                   </div>
                 </CardContent>
               </Card>
