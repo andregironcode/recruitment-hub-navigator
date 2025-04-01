@@ -45,6 +45,12 @@ const JobList: React.FC<JobListProps> = ({ jobs, loading = false }) => {
     );
   }
 
+  // Function to strip HTML tags for preview
+  const stripHtml = (html: string) => {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return doc.body.textContent || '';
+  };
+
   return (
     <div className="space-y-4">
       {jobs.map((job) => (
@@ -73,7 +79,7 @@ const JobList: React.FC<JobListProps> = ({ jobs, loading = false }) => {
               </div>
               
               <div className="mt-4">
-                <p className="text-gray-600 line-clamp-2">{job.description}</p>
+                <p className="text-gray-600 line-clamp-2">{stripHtml(job.description)}</p>
               </div>
               
               <div className="mt-4 flex flex-wrap gap-2">

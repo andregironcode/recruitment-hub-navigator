@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -8,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { MapPin, Briefcase, Clock, Building, Share, ArrowLeft } from 'lucide-react';
 import { getJobById } from '@/services/jobService';
 import { Job } from '@/components/jobs/JobList';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 const JobDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -127,24 +126,10 @@ const JobDetail = () => {
 
                   <div className="mb-8">
                     <h2 className="text-xl font-semibold mb-4 text-recruitment-dark">Job Description</h2>
-                    <p className="text-gray-600 whitespace-pre-line">
-                      {job.description}
-                      {/* Extended description for detail view */}
-                      {"\n\n"}
-                      As a {job.title} at {job.company}, you will be responsible for driving projects from conception to completion, collaborating with cross-functional teams, and delivering high-quality results.
-                      {"\n\n"}
-                      The ideal candidate will have:
-                      {"\n"}
-                      • Minimum of 3-5 years of relevant experience
-                      {"\n"}
-                      • Strong communication and teamwork skills
-                      {"\n"}
-                      • Ability to work in a fast-paced environment
-                      {"\n"}
-                      • Passion for innovation and continuous improvement
-                      {"\n\n"}
-                      We offer competitive compensation, excellent benefits, and opportunities for professional growth.
-                    </p>
+                    <div 
+                      className="text-gray-600 prose prose-sm max-w-none" 
+                      dangerouslySetInnerHTML={{ __html: job.description }}
+                    />
                   </div>
 
                   <div>

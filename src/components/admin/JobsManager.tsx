@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { 
   getAllJobs, 
@@ -23,8 +22,8 @@ import { Plus, Edit, Trash2, Filter } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import RichTextEditor from "./RichTextEditor";
 
 // Make sure we use the same Job interface from JobList
 import { Job } from "@/components/jobs/JobList";
@@ -89,6 +88,10 @@ const JobsManager = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+  
+  const handleDescriptionChange = (value: string) => {
+    setFormData(prev => ({ ...prev, description: value }));
   };
   
   const handleCheckboxChange = (checked: boolean) => {
@@ -288,7 +291,7 @@ const JobsManager = () => {
       )}
       
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{currentJob ? "Edit Job" : "Add New Job"}</DialogTitle>
             <DialogDescription>
@@ -408,14 +411,13 @@ const JobsManager = () => {
             
             <div className="space-y-2">
               <Label htmlFor="description">Job Description *</Label>
-              <Textarea 
-                id="description" 
-                name="description" 
-                value={formData.description} 
-                onChange={handleInputChange} 
-                rows={6} 
-                required 
+              <RichTextEditor
+                value={formData.description}
+                onChange={handleDescriptionChange}
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Use the toolbar to format your text with headings, lists, and text styles.
+              </p>
             </div>
             
             <DialogFooter>
