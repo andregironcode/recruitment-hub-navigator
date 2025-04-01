@@ -55,6 +55,7 @@ serve(async (req) => {
     }
     
     let resumeText = '';
+    let resumeFileData = null;
     
     // Extract text from resume if URL is provided
     if (resumeUrl) {
@@ -65,7 +66,7 @@ serve(async (req) => {
         console.log('Detected Supabase storage URL');
         
         try {
-          // Just get the content type, we'll pass the URL directly to OpenAI
+          // Get the content type and the file data
           const headResponse = await fetch(resumeUrl, { method: 'HEAD' });
           
           if (!headResponse.ok) {
@@ -76,8 +77,17 @@ serve(async (req) => {
           console.log(`File content type: ${contentType}`);
           
           if (contentType?.includes('application/pdf')) {
-            console.log("PDF detected, will pass URL directly to OpenAI");
-            resumeText = "PDF document will be processed directly";
+            console.log("PDF detected, downloading file content");
+            // Download the PDF content directly
+            const pdfResponse = await fetch(resumeUrl);
+            if (!pdfResponse.ok) {
+              throw new Error(`Failed to download PDF: ${pdfResponse.statusText}`);
+            }
+            
+            // Get the PDF data as an array buffer
+            resumeFileData = await pdfResponse.arrayBuffer();
+            console.log(`Successfully downloaded PDF, size: ${resumeFileData.byteLength} bytes`);
+            resumeText = "PDF downloaded successfully and will be processed directly via the OpenAI API";
           } else if (contentType?.includes('text')) {
             // For text files, just get the content directly
             const response = await fetch(resumeUrl);
@@ -164,91 +174,162 @@ serve(async (req) => {
       );
     }
     
-    // Prepare the messages for OpenAI to analyze the resume against job description
-    let messages = [];
-    
-    if (resumeUrl && resumeUrl.includes('.pdf')) {
-      // If we have a PDF URL, use it directly with the OpenAI API
-      messages = [
-        { 
-          role: 'system', 
-          content: `You are an AI recruitment assistant that analyzes resumes against job descriptions.
-          Analyze the resume PDF URL that will be provided in the user message.
-          Extract relevant education, experience, and skills.
-          Your task is to determine how well the candidate matches the requirements.`
-        },
-        { 
-          role: 'user', 
-          content: `Analyze how well this resume matches the following job description:
-      
-          JOB DESCRIPTION:
-          ${jobDescription}
-          
-          RESUME PDF URL: ${resumeUrl}
-          
-          Return ONLY a JSON object with these fields:
-          1. educationLevel: The candidate's highest level of education mentioned (or "Unknown" if not found)
-          2. yearsExperience: Total relevant years of experience (or "Unknown" if not clearly stated)
-          3. skillsMatch: Overall match as "High", "Medium", or "Low"
-          4. keySkills: Array of key skills found in resume that match job requirements
-          5. missingRequirements: Array of key requirements from job description not found in resume
-          6. overallScore: A numeric score from 0-100 representing overall match percentage
-          
-          Return your analysis as clean, parseable JSON WITHOUT explanations, code blocks, or other text.`
-        }
-      ];
-      
-      console.log("Using direct PDF URL for resume analysis");
-    } else {
-      // Use text-only approach
-      messages = [
-        { 
-          role: 'system',
-          content: `You are an AI recruitment assistant that analyzes resumes against job descriptions.
-          Extract relevant education, experience, and skills from the resume text.
-          Your task is to determine how well the candidate matches the job requirements.`
-        },
-        { 
-          role: 'user', 
-          content: `Analyze how well this resume matches the following job description:
-      
-          JOB DESCRIPTION:
-          ${jobDescription}
-          
-          RESUME TEXT:
-          ${resumeText}
-          
-          Return ONLY a JSON object with these fields:
-          1. educationLevel: The candidate's highest level of education mentioned (or "Unknown" if not found)
-          2. yearsExperience: Total relevant years of experience (or "Unknown" if not clearly stated)
-          3. skillsMatch: Overall match as "High", "Medium", or "Low"
-          4. keySkills: Array of key skills found in resume that match job requirements
-          5. missingRequirements: Array of key requirements from job description not found in resume
-          6. overallScore: A numeric score from 0-100 representing overall match percentage
-          
-          Return your analysis as clean, parseable JSON WITHOUT explanations, code blocks, or other text.`
-        }
-      ];
-      
-      console.log("Using text-only approach for resume analysis");
-    }
-    
     try {
       console.log("Sending request to OpenAI");
       
-      // Send the prompt to OpenAI for analysis
-      const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',  // Using gpt-4o-mini as requested
-          messages: messages,
-          temperature: 0.3,
-        }),
-      });
+      let openaiResponse;
+      
+      // Change in approach: direct file upload for PDFs vs text-based approach
+      if (resumeFileData && resumeUrl && resumeUrl.includes('.pdf')) {
+        console.log("Using direct PDF upload for resume analysis");
+        
+        // Create a FormData object to upload the PDF directly
+        const formData = new FormData();
+        
+        // Add system and user message parts
+        formData.append(
+          'purpose', 
+          'assistant_request'
+        );
+        
+        formData.append(
+          'system', 
+          `You are an AI recruitment assistant that analyzes resumes against job descriptions.
+          Extract relevant education, experience, and skills from the resume PDF.
+          Your task is to determine how well the candidate matches the job requirements.`
+        );
+        
+        formData.append(
+          'user', 
+          `Analyze how well this resume matches the following job description:
+          
+          JOB DESCRIPTION:
+          ${jobDescription}
+          
+          Return ONLY a JSON object with these fields:
+          1. educationLevel: The candidate's highest level of education mentioned (or "Unknown" if not found)
+          2. yearsExperience: Total relevant years of experience (or "Unknown" if not clearly stated)
+          3. skillsMatch: Overall match as "High", "Medium", or "Low"
+          4. keySkills: Array of key skills found in resume that match job requirements
+          5. missingRequirements: Array of key requirements from job description not found in resume
+          6. overallScore: A numeric score from 0-100 representing overall match percentage
+          
+          Return your analysis as clean, parseable JSON WITHOUT explanations, code blocks, or other text.`
+        );
+        
+        // Create a Blob from the array buffer and append to form
+        const pdfBlob = new Blob([resumeFileData], { type: 'application/pdf' });
+        formData.append(
+          'file', 
+          pdfBlob, 
+          'resume.pdf'
+        );
+        
+        // Send the request to OpenAI with file upload
+        openaiResponse = await fetch('https://api.openai.com/v1/files/assistants_tools', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+          },
+          body: formData,
+        });
+        
+        if (!openaiResponse.ok) {
+          // If direct file upload fails, try the text-based approach as fallback
+          console.error(`File upload failed: ${await openaiResponse.text()}`);
+          console.log("Falling back to text-based approach");
+          
+          // Prepare messages for text-based approach
+          const messages = [
+            { 
+              role: 'system',
+              content: `You are an AI recruitment assistant that analyzes resumes against job descriptions.
+              Extract relevant education, experience, and skills from the resume text.
+              Your task is to determine how well the candidate matches the job requirements.`
+            },
+            { 
+              role: 'user', 
+              content: `Analyze how well this resume matches the following job description:
+          
+              JOB DESCRIPTION:
+              ${jobDescription}
+              
+              RESUME TEXT:
+              ${resumeText}
+              
+              Return ONLY a JSON object with these fields:
+              1. educationLevel: The candidate's highest level of education mentioned (or "Unknown" if not found)
+              2. yearsExperience: Total relevant years of experience (or "Unknown" if not clearly stated)
+              3. skillsMatch: Overall match as "High", "Medium", or "Low"
+              4. keySkills: Array of key skills found in resume that match job requirements
+              5. missingRequirements: Array of key requirements from job description not found in resume
+              6. overallScore: A numeric score from 0-100 representing overall match percentage
+              
+              Return your analysis as clean, parseable JSON WITHOUT explanations, code blocks, or other text.`
+            }
+          ];
+          
+          // Use the chat completions API as fallback
+          openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: messages,
+              temperature: 0.3,
+            }),
+          });
+        }
+      } else {
+        // Use text-only approach
+        const messages = [
+          { 
+            role: 'system',
+            content: `You are an AI recruitment assistant that analyzes resumes against job descriptions.
+            Extract relevant education, experience, and skills from the resume text.
+            Your task is to determine how well the candidate matches the job requirements.`
+          },
+          { 
+            role: 'user', 
+            content: `Analyze how well this resume matches the following job description:
+        
+            JOB DESCRIPTION:
+            ${jobDescription}
+            
+            RESUME TEXT:
+            ${resumeText}
+            
+            Return ONLY a JSON object with these fields:
+            1. educationLevel: The candidate's highest level of education mentioned (or "Unknown" if not found)
+            2. yearsExperience: Total relevant years of experience (or "Unknown" if not clearly stated)
+            3. skillsMatch: Overall match as "High", "Medium", or "Low"
+            4. keySkills: Array of key skills found in resume that match job requirements
+            5. missingRequirements: Array of key requirements from job description not found in resume
+            6. overallScore: A numeric score from 0-100 representing overall match percentage
+            
+            Return your analysis as clean, parseable JSON WITHOUT explanations, code blocks, or other text.`
+          }
+        ];
+        
+        console.log("Using text-only approach for resume analysis");
+        
+        // Send the prompt to OpenAI for analysis
+        openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: messages,
+            temperature: 0.3,
+          }),
+        });
+      }
       
       if (!openaiResponse.ok) {
         const errorText = await openaiResponse.text();
@@ -257,7 +338,24 @@ serve(async (req) => {
       }
       
       const openaiData = await openaiResponse.json();
-      const analysisText = openaiData.choices[0].message.content;
+      let analysisText;
+      
+      // Handle response based on API used (file upload vs chat completions)
+      if (openaiData.choices) {
+        // Response from chat completions API
+        analysisText = openaiData.choices[0].message.content;
+      } else {
+        // Response from file upload API
+        analysisText = openaiData.content || JSON.stringify({
+          educationLevel: "Unknown",
+          yearsExperience: "Unknown",
+          skillsMatch: "Low",
+          keySkills: ["Unable to process PDF format"],
+          missingRequirements: ["Unable to determine"],
+          overallScore: 0,
+          fallback: true
+        });
+      }
       
       console.log(`OpenAI response received, length: ${analysisText.length}`);
       console.log(`Analysis text preview: ${analysisText.substring(0, 200)}`);
