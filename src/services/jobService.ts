@@ -392,6 +392,9 @@ export async function submitApplication({
         if (!jobError && jobData?.description) {
           console.log('Got job description, sending for AI analysis');
           
+          // Import the analyzeResume function from aiService
+          const { analyzeResume } = await import('@/services/aiService');
+          
           // Analyze the resume asynchronously without waiting for result
           // This allows the application to be submitted even if analysis fails
           analyzeResume({
