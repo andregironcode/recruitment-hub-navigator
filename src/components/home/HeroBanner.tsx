@@ -21,21 +21,20 @@ const HeroBanner = () => {
         <div className="pt-16 pb-20 md:pt-24 md:pb-28 flex flex-col md:flex-row items-center">
           <div className="md:w-1/2 text-center md:text-left mb-10 md:mb-0">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-white animate-fade-in">
-              Connecting <span className="text-white/90">Talent</span> With <span className="text-white/90">Opportunity</span>
+              The <span className="text-white/90">Heather Harries</span> Group
             </h1>
             <p className="text-lg md:text-xl text-white/80 mb-8 max-w-lg">
-              For over 25 years, Harries Recruitment has been the trusted partner
-              for exceptional talent acquisition across the UK.
+              Business disrupter and innovator, the group has grown based on innovative thinking underwritten with old-fashioned values. The brand values are integrity, honesty, service, value and above all outstanding customer care.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
-              <Link to="/jobs">
+              <Link to="/about">
                 <Button size={isMobile ? "default" : "lg"} className="bg-white text-recruitment-primary hover:bg-gray-100 font-medium w-full sm:w-auto">
-                  View Jobs <ArrowRight className="ml-2 h-5 w-5" />
+                  Learn More <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
               <Link to="/contact">
                 <Button size={isMobile ? "default" : "lg"} variant="outline" className="border-white text-white hover:bg-white/10 font-medium w-full sm:w-auto">
-                  Hire Talent
+                  Contact Us
                 </Button>
               </Link>
             </div>
@@ -56,7 +55,7 @@ const HeroBanner = () => {
       <div className="bg-white py-4 border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-wrap justify-center md:justify-between items-center gap-8 text-sm text-gray-500">
-            <span>Trusted by leading companies across the UK</span>
+            <span>In a world where people have become numbers, our customers are our strategic partners, and their success is our success.</span>
             <div className="flex flex-wrap justify-center gap-8 md:gap-12">
               <img src="/client-logo-1.svg" alt="Client logo" className="h-6 opacity-60 hover:opacity-100 transition-opacity" />
               <img src="/client-logo-2.svg" alt="Client logo" className="h-6 opacity-60 hover:opacity-100 transition-opacity" />

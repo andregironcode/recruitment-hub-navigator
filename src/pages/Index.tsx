@@ -2,20 +2,22 @@
 import React from 'react';
 import Layout from '@/components/layout/Layout';
 import HeroBanner from '@/components/home/HeroBanner';
-import IndustryCards from '@/components/home/IndustryCards';
-import CompanyStats from '@/components/home/CompanyStats';
-import Testimonials from '@/components/home/Testimonials';
+import AboutSection from '@/components/home/AboutSection';
+import ServiceClusters from '@/components/home/ServiceClusters';
+import TeamSection from '@/components/home/TeamSection';
+import ValueProposition from '@/components/home/ValueProposition';
+import VisionSection from '@/components/home/VisionSection';
 import CallToAction from '@/components/home/CallToAction';
-import RecentJobs from '@/components/home/RecentJobs';
 
 const Index = () => {
   return (
     <Layout>
       <HeroBanner />
-      <CompanyStats />
-      <RecentJobs />
-      <IndustryCards />
-      <Testimonials />
+      <AboutSection />
+      <ServiceClusters />
+      <TeamSection />
+      <ValueProposition />
+      <VisionSection />
       <CallToAction />
     </Layout>
   );
