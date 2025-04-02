@@ -1,0 +1,5 @@
+
+<svg width="120" height="40" viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg">
+  <polygon points="20,10 30,30 10,30" fill="none" stroke="#4e1a3d" stroke-width="2"/>
+  <text x="60" y="25" font-family="Arial" font-size="14" text-anchor="middle" fill="#4e1a3d">TRIANGLE LTD</text>
+</svg>

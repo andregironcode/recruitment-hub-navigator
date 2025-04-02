@@ -3,42 +3,66 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { ArrowRight } from 'lucide-react';
 
 const HeroBanner = () => {
   const isMobile = useIsMobile();
   
   return (
-    <div className="bg-gradient-to-r from-recruitment-primary to-recruitment-secondary text-white py-12 md:py-24">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-center md:justify-start mb-8">
-          <img 
-            src="/logo-white.png" 
-            alt="Harries Recruitment Logo" 
-            className="h-16 md:h-20"
-          />
+    <div className="relative bg-gradient-to-r from-recruitment-primary to-recruitment-secondary overflow-hidden">
+      <div className="absolute inset-0 opacity-10">
+        <img 
+          src="/abstract-pattern.svg" 
+          alt="" 
+          className="w-full h-full object-cover"
+        />
+      </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <div className="pt-16 pb-20 md:pt-24 md:pb-28 flex flex-col md:flex-row items-center">
+          <div className="md:w-1/2 text-center md:text-left mb-10 md:mb-0">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-white animate-fade-in">
+              Connecting <span className="text-white/90">Talent</span> With <span className="text-white/90">Opportunity</span>
+            </h1>
+            <p className="text-lg md:text-xl text-white/80 mb-8 max-w-lg">
+              For over 25 years, Harries Recruitment has been the trusted partner
+              for exceptional talent acquisition across the UK.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
+              <Link to="/jobs">
+                <Button size={isMobile ? "default" : "lg"} className="bg-white text-recruitment-primary hover:bg-gray-100 font-medium w-full sm:w-auto">
+                  View Jobs <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+              </Link>
+              <Link to="/contact">
+                <Button size={isMobile ? "default" : "lg"} variant="outline" className="border-white text-white hover:bg-white/10 font-medium w-full sm:w-auto">
+                  Hire Talent
+                </Button>
+              </Link>
+            </div>
+          </div>
+          <div className="md:w-1/2 flex justify-center md:justify-end">
+            <div className="relative">
+              <div className="absolute inset-0 bg-recruitment-primary rounded-full blur-3xl opacity-20"></div>
+              <img 
+                src="/recruitment-hero.svg" 
+                alt="Professional recruitment" 
+                className="relative z-10 max-w-full h-auto lg:max-w-lg"
+              />
+            </div>
+          </div>
         </div>
-        <div className="md:w-2/3 text-center md:text-left">
-          <h1 className="text-3xl md:text-5xl font-bold mb-4 animate-fade-in">
-            Building Winning Teams
-          </h1>
-          <p className="text-lg md:text-xl mb-6 md:mb-10 opacity-90">
-            Harries Recruitment specialises in connecting exceptional talent with leading companies. 
-            {!isMobile && (
-              <span> For over 25 years, we've built lasting relationships, becoming trusted partners in 
-              recruitment across the UK.</span>
-            )}
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center md:justify-start">
-            <Link to="/jobs">
-              <Button size={isMobile ? "default" : "lg"} className="bg-white text-recruitment-primary hover:bg-gray-100 font-medium w-full sm:w-auto">
-                Browse Jobs
-              </Button>
-            </Link>
-            <Link to="/contact">
-              <Button size={isMobile ? "default" : "lg"} variant="outline" className="border-white text-white hover:bg-white/10 font-medium w-full sm:w-auto">
-                Contact Us
-              </Button>
-            </Link>
+      </div>
+      
+      <div className="bg-white py-4 border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-wrap justify-center md:justify-between items-center gap-8 text-sm text-gray-500">
+            <span>Trusted by leading companies across the UK</span>
+            <div className="flex flex-wrap justify-center gap-8 md:gap-12">
+              <img src="/client-logo-1.svg" alt="Client logo" className="h-6 opacity-60 hover:opacity-100 transition-opacity" />
+              <img src="/client-logo-2.svg" alt="Client logo" className="h-6 opacity-60 hover:opacity-100 transition-opacity" />
+              <img src="/client-logo-3.svg" alt="Client logo" className="h-6 opacity-60 hover:opacity-100 transition-opacity" />
+              <img src="/client-logo-4.svg" alt="Client logo" className="h-6 opacity-60 hover:opacity-100 transition-opacity" />
+            </div>
           </div>
         </div>
       </div>

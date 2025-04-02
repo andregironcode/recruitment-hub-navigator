@@ -2,6 +2,7 @@
 import React from 'react';
 import { Users, Briefcase, Award, Building } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { Card, CardContent } from '@/components/ui/card';
 
 const stats = [
   {
@@ -38,25 +39,41 @@ const CompanyStats = () => {
   const isMobile = useIsMobile();
   
   return (
-    <section className="py-10 md:py-16 bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 className="text-2xl md:text-3xl font-bold text-center mb-8 md:mb-12 text-recruitment-dark">
-          Proven Recruitment Excellence
-        </h2>
+    <section className="py-16 md:py-24 bg-recruitment-light relative overflow-hidden">
+      <div className="absolute inset-0 opacity-5">
+        <img 
+          src="/dots-pattern.svg" 
+          alt="" 
+          className="w-full h-full object-cover"
+        />
+      </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <div className="text-center mb-12 md:mb-16">
+          <h2 className="text-3xl md:text-4xl font-bold text-recruitment-primary mb-4">
+            Our Recruitment Expertise
+          </h2>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Harries Recruitment has established a track record of excellence with our dedicated approach to talent acquisition.
+          </p>
+        </div>
         
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
           {stats.map((item) => (
-            <div 
+            <Card 
               key={item.id} 
-              className="flex flex-col items-center p-3 md:p-6 text-center"
+              className="border-2 border-transparent hover:border-recruitment-primary/10 hover:shadow-lg transition-all duration-300"
             >
-              <div className="bg-recruitment-light p-3 md:p-4 rounded-full mb-3 md:mb-4 text-recruitment-primary">
-                <item.icon size={isMobile ? 24 : 32} />
-              </div>
-              <h3 className="text-2xl md:text-3xl font-bold text-recruitment-primary mb-1">{item.stat}</h3>
-              <h4 className="text-lg md:text-xl font-semibold text-recruitment-dark mb-1 md:mb-2">{item.title}</h4>
-              <p className="text-sm md:text-base text-gray-600">{item.description}</p>
-            </div>
+              <CardContent className="p-6 text-center">
+                <div className="flex justify-center">
+                  <div className="bg-recruitment-primary/10 p-4 rounded-full mb-4 text-recruitment-primary">
+                    <item.icon size={isMobile ? 28 : 32} />
+                  </div>
+                </div>
+                <h3 className="text-3xl md:text-4xl font-bold text-recruitment-primary mb-2">{item.stat}</h3>
+                <h4 className="text-xl font-semibold text-recruitment-dark mb-2">{item.title}</h4>
+                <p className="text-gray-600">{item.description}</p>
+              </CardContent>
+            </Card>
           ))}
         </div>
       </div>
