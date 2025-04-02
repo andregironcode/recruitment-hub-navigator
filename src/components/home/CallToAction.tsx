@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -51,7 +50,11 @@ const CallToAction = () => {
                 </Link>
                 <Link to="/contact" className="w-full sm:w-auto">
                   <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-                    <Button size={isMobile ? "default" : "lg"} variant="outline" className="border-recruitment-primary text-recruitment-primary hover:bg-recruitment-primary hover:text-white w-full sm:w-auto">
+                    <Button 
+                      size={isMobile ? "default" : "lg"} 
+                      variant="outline" 
+                      className="border-recruitment-primary bg-white text-recruitment-primary hover:bg-recruitment-primary hover:text-white w-full sm:w-auto"
+                    >
                       Contact Our Team
                     </Button>
                   </motion.div>
