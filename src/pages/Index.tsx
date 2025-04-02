@@ -11,6 +11,7 @@ import CallToAction from '@/components/home/CallToAction';
 import CompanyStats from '@/components/home/CompanyStats';
 import IndustryCards from '@/components/home/IndustryCards';
 import Testimonials from '@/components/home/Testimonials';
+import RecentJobs from '@/components/home/RecentJobs';
 
 const Index = () => {
   return (
@@ -19,6 +20,7 @@ const Index = () => {
       <CompanyStats />
       <AboutSection />
       <ServiceClusters />
+      <RecentJobs />
       <IndustryCards />
       <TeamSection />
       <ValueProposition />
