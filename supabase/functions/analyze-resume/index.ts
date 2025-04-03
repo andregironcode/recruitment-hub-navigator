@@ -5,6 +5,45 @@ import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.17
 // Initialize PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
+// Define types for Azure Form Recognizer response
+interface AzureFormRecognizerResponse {
+  status: string;
+  analyzeResult: {
+    content: string;
+    documentResults: Array<{
+      fields: {
+        Name?: { value: string };
+        Email?: { value: string };
+        Phone?: { value: string };
+        Address?: { value: string };
+        Education?: {
+          valueArray: Array<{
+            valueObject: {
+              School?: { value: string };
+              Degree?: { value: string };
+              Field?: { value: string };
+              Year?: { value: string };
+              GPA?: { value: string };
+            };
+          }>;
+        };
+        Experience?: {
+          valueArray: Array<{
+            valueObject: {
+              Company?: { value: string };
+              Title?: { value: string };
+              StartDate?: { value: string };
+              EndDate?: { value: string };
+              Description?: { value: string };
+            };
+          }>;
+        };
+        Skills?: { value: string };
+      };
+    }>;
+  };
+}
+
 // Define resume section types
 type ResumeSection = {
   title: string;
@@ -43,6 +82,12 @@ type StructuredResumeData = {
 
 // Add new types for the multi-stage processing
 interface ExtractedResumeData {
+  contactInfo: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    location?: string;
+  };
   education: Array<{
     institution: string;
     degree: string;
@@ -55,7 +100,7 @@ interface ExtractedResumeData {
     title: string;
     startDate?: string;
     endDate?: string;
-    description?: string;
+    description: string;
   }>;
   skills: {
     technical: string[];
@@ -71,20 +116,39 @@ function detectResumeSections(text: string): ResumeSection[] {
   let currentSection: ResumeSection | null = null;
   let currentContent: string[] = [];
 
-  // Common section headers
+  // Common section headers with more variations
   const sectionHeaders = {
-    education: ['education', 'academic', 'qualification', 'degree'],
-    experience: ['experience', 'work', 'employment', 'career'],
-    skills: ['skills', 'expertise', 'competencies', 'technologies']
+    education: [
+      'education', 'academic', 'qualification', 'degree', 'studies',
+      'university', 'college', 'school', 'institute', 'academy'
+    ],
+    experience: [
+      'experience', 'work', 'employment', 'career', 'professional',
+      'work history', 'employment history', 'career history',
+      'professional experience', 'work experience'
+    ],
+    skills: [
+      'skills', 'expertise', 'competencies', 'technologies',
+      'technical skills', 'professional skills', 'core competencies',
+      'key skills', 'areas of expertise'
+    ]
   };
 
   for (const line of lines) {
-    const trimmedLine = line.trim().toLowerCase();
+    const trimmedLine = line.trim();
+    const lowerLine = trimmedLine.toLowerCase();
     
     // Check if line is a section header
     let sectionType: keyof typeof sectionHeaders | null = null;
     for (const [type, headers] of Object.entries(sectionHeaders)) {
-      if (headers.some(header => trimmedLine.includes(header))) {
+      if (headers.some(header => {
+        // Check for exact match or header followed by colon
+        return lowerLine === header || 
+               lowerLine === `${header}:` ||
+               // Check for all caps headers
+               trimmedLine === trimmedLine.toUpperCase() && 
+               lowerLine.includes(header);
+      })) {
         sectionType = type as keyof typeof sectionHeaders;
         break;
       }
@@ -99,13 +163,15 @@ function detectResumeSections(text: string): ResumeSection[] {
 
       // Start new section
       currentSection = {
-        title: line.trim(),
+        title: trimmedLine,
         content: '',
         type: sectionType as ResumeSection['type']
       };
       currentContent = [];
     } else if (currentSection) {
-      currentContent.push(line);
+      // Skip empty lines at the start of sections
+      if (currentContent.length === 0 && !trimmedLine) continue;
+      currentContent.push(trimmedLine);
     }
   }
 
@@ -167,32 +233,114 @@ function extractStructuredData(sections: ResumeSection[]): StructuredResumeData 
 
       case 'experience':
         const experienceEntries = section.content.split('\n\n');
+        let currentEntry: {
+          company?: string;
+          title?: string;
+          startDate?: string;
+          endDate?: string;
+          description: string[];
+        } = { description: [] };
+
         for (const entry of experienceEntries) {
-          const lines = entry.split('\n');
-          const titleLine = lines[0]?.trim() || '';
-          const companyLine = lines[1]?.trim() || '';
-          const dateMatch = titleLine.match(/\b(19|20)\d{2}\b/g);
+          const lines = entry.split('\n').map(line => line.trim()).filter(line => line);
           
-          data.experience.push({
-            company: companyLine,
-            title: titleLine.split(dateMatch?.[0] || '')[0].trim(),
-            startDate: dateMatch?.[0],
-            endDate: dateMatch?.[1],
-            description: lines.slice(2).join('\n')
-          });
+          // Try to find dates in various formats
+          const datePatterns = [
+            /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}\s*-\s*(Present|Current|(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4})\b/i,
+            /\b(19|20)\d{2}\s*-\s*(Present|Current|(19|20)\d{2})\b/,
+            /\b\d{1,2}\/\d{4}\s*-\s*(Present|Current|\d{1,2}\/\d{4})\b/
+          ];
+
+          let datesFound = false;
+          for (const line of lines) {
+            for (const pattern of datePatterns) {
+              const match = line.match(pattern);
+              if (match) {
+                const [startDate, endDate] = match[0].split(/\s*-\s*/);
+                currentEntry.startDate = startDate.trim();
+                currentEntry.endDate = endDate.trim();
+                datesFound = true;
+                break;
+              }
+            }
+            if (datesFound) break;
+          }
+
+          // If no dates found, try to find years
+          if (!datesFound) {
+            const yearMatch = entry.match(/\b(19|20)\d{2}\b/g);
+            if (yearMatch && yearMatch.length >= 2) {
+              currentEntry.startDate = yearMatch[0];
+              currentEntry.endDate = yearMatch[1];
+            }
+          }
+
+          // Extract company and title
+          const firstLine = lines[0] || '';
+          const secondLine = lines[1] || '';
+          
+          // Check if first line contains company name
+          if (firstLine && !firstLine.match(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\b/i) && 
+              !firstLine.match(/\b(19|20)\d{2}\b/)) {
+            currentEntry.company = firstLine;
+            currentEntry.title = secondLine;
+          } else {
+            currentEntry.title = firstLine;
+            currentEntry.company = secondLine;
+          }
+
+          // Add description lines
+          currentEntry.description = lines.slice(2);
+
+          // Add the entry if we have enough information
+          if (currentEntry.company && currentEntry.title) {
+            data.experience.push({
+              company: currentEntry.company,
+              title: currentEntry.title,
+              startDate: currentEntry.startDate,
+              endDate: currentEntry.endDate,
+              description: currentEntry.description.join('\n')
+            });
+          }
+
+          // Reset for next entry
+          currentEntry = { description: [] };
         }
         break;
 
       case 'skills':
         const skillLines = section.content.split('\n');
+        let currentCategory = 'technical'; // Default category
+        
         for (const line of skillLines) {
-          const trimmedLine = line.trim().toLowerCase();
-          if (trimmedLine.includes('technical') || trimmedLine.includes('programming')) {
-            data.skills.technical.push(line.trim());
-          } else if (trimmedLine.includes('soft') || trimmedLine.includes('interpersonal')) {
-            data.skills.soft.push(line.trim());
-          } else {
-            data.skills.industry.push(line.trim());
+          const trimmedLine = line.trim();
+          if (!trimmedLine) continue;
+
+          // Check for category headers
+          if (trimmedLine.toLowerCase().includes('technical') || 
+              trimmedLine.toLowerCase().includes('programming') ||
+              trimmedLine.toLowerCase().includes('tools')) {
+            currentCategory = 'technical';
+            continue;
+          } else if (trimmedLine.toLowerCase().includes('soft') || 
+                     trimmedLine.toLowerCase().includes('interpersonal') ||
+                     trimmedLine.includes('communication')) {
+            currentCategory = 'soft';
+            continue;
+          } else if (trimmedLine.toLowerCase().includes('industry') || 
+                     trimmedLine.toLowerCase().includes('domain')) {
+            currentCategory = 'industry';
+            continue;
+          }
+
+          // Split skills by common delimiters
+          const skills = trimmedLine.split(/[,;]|\s+and\s+/).map(skill => skill.trim());
+          
+          // Add skills to appropriate category
+          for (const skill of skills) {
+            if (skill) {
+              data.skills[currentCategory].push(skill);
+            }
           }
         }
         break;
@@ -293,87 +441,138 @@ function validateStructuredData(data: StructuredResumeData): { isValid: boolean;
   };
 }
 
-// Update the extractTextFromPDF function with better logging
+// Add a delay utility function
+async function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Azure Form Recognizer implementation
 async function extractTextFromPDF(pdfBuffer: ArrayBuffer): Promise<{ rawText: string; structuredData: StructuredResumeData }> {
-  logSection('Starting PDF extraction', { bufferSize: pdfBuffer.byteLength });
+  const endpoint = process.env.AZURE_FORM_RECOGNIZER_ENDPOINT;
+  const key = process.env.AZURE_FORM_RECOGNIZER_KEY;
   
-  const pdf = await pdfjsLib.getDocument({ data: pdfBuffer }).promise;
-  logSection('PDF document loaded', { pageCount: pdf.numPages });
-  
-  let fullText = '';
-  const pageTexts: string[] = [];
-
-  // Extract text from each page while preserving structure
-  for (let i = 1; i <= pdf.numPages; i++) {
-    logSection(`Processing page ${i}`, {}, 'debug');
-    
-    const page = await pdf.getPage(i);
-    const textContent = await page.getTextContent();
-    let pageText = '';
-    let lastY = null;
-    let lastFontSize = null;
-
-    // Sort text items by vertical position and then horizontal position
-    const textItems = textContent.items.sort((a: any, b: any) => {
-      if (Math.abs(a.transform[5] - b.transform[5]) > 5) {
-        return b.transform[5] - a.transform[5];
-      }
-      return a.transform[4] - b.transform[4];
-    });
-
-    logSection(`Page ${i} text items`, { count: textItems.length }, 'debug');
-
-    // Process text items with better formatting preservation
-    for (const item of textItems) {
-      const { str, transform, fontName, fontSize } = item as any;
-      const y = transform[5];
-      const x = transform[4];
-
-      // Add spacing based on vertical position
-      if (lastY !== null && Math.abs(y - lastY) > 5) {
-        pageText += '\n';
-      }
-
-      // Add spacing based on font size changes
-      if (lastFontSize !== null && Math.abs(fontSize - lastFontSize) > 2) {
-        pageText += ' ';
-      }
-
-      pageText += str;
-      lastY = y;
-      lastFontSize = fontSize;
-    }
-
-    pageTexts.push(pageText);
-    fullText += pageText + '\n\n';
-    
-    logSection(`Page ${i} processed`, { textLength: pageText.length }, 'debug');
+  if (!endpoint || !key) {
+    throw new Error('Azure Form Recognizer credentials not configured');
   }
 
-  // Clean up the text
-  fullText = fullText
-    .replace(/\s+/g, ' ')  // Replace multiple spaces with single space
-    .replace(/\n{3,}/g, '\n\n') // Replace multiple newlines with double newline
-    .trim();
+  // Convert ArrayBuffer to base64
+  const base64Data = btoa(String.fromCharCode(...new Uint8Array(pdfBuffer)));
 
-  logSection('Text extraction complete', { 
-    totalLength: fullText.length,
-    pageCount: pageTexts.length,
-    averagePageLength: Math.round(fullText.length / pageTexts.length)
+  // Call Azure Form Recognizer
+  const response = await fetch(`${endpoint}/formrecognizer/documentModels/prebuilt-document:analyze?api-version=2023-07-31`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Ocp-Apim-Subscription-Key': key
+    },
+    body: JSON.stringify({
+      base64Source: base64Data
+    })
   });
 
-  // Extract structured data using a more reliable method
-  const structuredData = extractStructuredDataFromText(fullText);
-  
-  // Validate the structured data
-  const validation = validateStructuredData(structuredData);
-  if (!validation.isValid) {
-    logSection('Structured data validation errors', validation.errors, 'error');
-  } else {
-    logSection('Structured data validation passed', {});
+  if (!response.ok) {
+    throw new Error(`Azure Form Recognizer error: ${response.statusText}`);
   }
 
-  return { rawText: fullText, structuredData };
+  const result = await response.json();
+  const operationLocation = response.headers.get('Operation-Location');
+
+  if (!operationLocation) {
+    throw new Error('No operation location returned from Azure Form Recognizer');
+  }
+
+  // Poll for results
+  let analysisResult: AzureFormRecognizerResponse | null = null;
+  for (let i = 0; i < 10; i++) {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    const statusResponse = await fetch(operationLocation, {
+      headers: {
+        'Ocp-Apim-Subscription-Key': key
+      }
+    });
+    
+    const statusResult = await statusResponse.json() as AzureFormRecognizerResponse;
+    
+    if (statusResult.status === 'succeeded') {
+      analysisResult = statusResult;
+      break;
+    }
+  }
+
+  if (!analysisResult) {
+    throw new Error('Timeout waiting for Azure Form Recognizer analysis');
+  }
+
+  // Process the results
+  const structuredData: StructuredResumeData = {
+    contactInfo: {},
+    education: [],
+    experience: [],
+    skills: {
+      technical: [],
+      soft: [],
+      industry: []
+    }
+  };
+
+  // Extract contact information
+  const contactFields = analysisResult.analyzeResult.documentResults[0].fields;
+  structuredData.contactInfo = {
+    name: contactFields.Name?.value || '',
+    email: contactFields.Email?.value || '',
+    phone: contactFields.Phone?.value || '',
+    location: contactFields.Address?.value || ''
+  };
+
+  // Extract education
+  if (contactFields.Education?.valueArray) {
+    structuredData.education = contactFields.Education.valueArray.map(item => ({
+      institution: item.valueObject.School?.value || '',
+      degree: item.valueObject.Degree?.value || '',
+      field: item.valueObject.Field?.value || '',
+      year: item.valueObject.Year?.value || '',
+      gpa: item.valueObject.GPA?.value || ''
+    }));
+  }
+
+  // Extract experience
+  if (contactFields.Experience?.valueArray) {
+    structuredData.experience = contactFields.Experience.valueArray.map(item => ({
+      company: item.valueObject.Company?.value || '',
+      title: item.valueObject.Title?.value || '',
+      startDate: item.valueObject.StartDate?.value || '',
+      endDate: item.valueObject.EndDate?.value || '',
+      description: item.valueObject.Description?.value || ''
+    }));
+  }
+
+  // Extract skills
+  if (contactFields.Skills?.value) {
+    const skillsText = contactFields.Skills.value;
+    
+    // Categorize skills
+    const technicalKeywords = ['programming', 'language', 'framework', 'tool', 'software', 'system', 'database'];
+    const softKeywords = ['communication', 'leadership', 'team', 'problem', 'time', 'management'];
+    
+    const skillsList = skillsText.split(/[,;]/).map(skill => skill.trim());
+    
+    skillsList.forEach(skill => {
+      const lowerSkill = skill.toLowerCase();
+      if (technicalKeywords.some(keyword => lowerSkill.includes(keyword))) {
+        structuredData.skills.technical.push(skill);
+      } else if (softKeywords.some(keyword => lowerSkill.includes(keyword))) {
+        structuredData.skills.soft.push(skill);
+      } else {
+        structuredData.skills.industry.push(skill);
+      }
+    });
+  }
+
+  // Get raw text
+  const rawText = analysisResult.analyzeResult.content;
+
+  return { rawText, structuredData };
 }
 
 // Add education level detection function
@@ -766,11 +965,16 @@ function generateFallbackAnalysis(resumeText: string, jobDescription: string): a
   };
 }
 
-// Add new function for the first GPT call to extract structured data
+// Enhanced GPT extraction with better prompts
 async function extractStructuredDataWithGPT(resumeText: string): Promise<ExtractedResumeData> {
   logSection('Starting GPT extraction', { textLength: resumeText.length });
   
-  const extractionPrompt = `Extract the following information from this resume in JSON format:
+  const extractionPrompt = `You are an expert resume parser. Your task is to extract ALL information from this resume in a structured format. Be thorough and accurate.
+
+Resume Text:
+${resumeText}
+
+Extract the following information in JSON format:
 {
   "education": [
     {
@@ -785,28 +989,45 @@ async function extractStructuredDataWithGPT(resumeText: string): Promise<Extract
     {
       "company": "exact company name",
       "title": "exact job title",
-      "startDate": "start date",
-      "endDate": "end date",
-      "description": "job description"
+      "startDate": "start date in YYYY-MM format",
+      "endDate": "end date in YYYY-MM format or 'Present'",
+      "description": "detailed job description including responsibilities and achievements"
     }
   ],
   "skills": {
-    "technical": ["list of technical skills"],
-    "soft": ["list of soft skills"],
-    "industry": ["list of industry skills"]
+    "technical": ["list of ALL technical skills mentioned"],
+    "soft": ["list of ALL soft skills mentioned"],
+    "industry": ["list of ALL industry-specific skills mentioned"]
   }
 }
 
 Guidelines:
-1. Extract ALL education information found in the resume
-2. Include exact institution names, degrees, and fields
-3. Extract ALL work experience with exact company names and titles
-4. List ALL skills mentioned, properly categorized
+1. Extract ALL education information found in the resume:
+   - Look for institution names, degrees, and fields of study
+   - Extract graduation years in YYYY format
+   - Include GPAs if mentioned
+   - Handle various education formats (e.g., "Bachelor of Science in Computer Science" or "B.S. Computer Science")
+
+2. Extract ALL work experience:
+   - Identify company names and job titles
+   - Convert dates to YYYY-MM format
+   - Extract detailed descriptions including:
+     * Key responsibilities
+     * Major achievements
+     * Technologies used
+     * Projects completed
+   - Handle various date formats (e.g., "Jan 2020 - Present" or "2020-01 - Present")
+
+3. Categorize ALL skills mentioned:
+   - Technical skills: programming languages, tools, frameworks, etc.
+   - Soft skills: communication, leadership, teamwork, etc.
+   - Industry skills: domain-specific knowledge and expertise
+
+4. Be thorough and include ALL information found in the resume
 5. Do not make assumptions or add information not present
 6. Return a valid JSON object
-
-Resume text:
-${resumeText}`;
+7. Handle various resume formats and layouts
+8. Preserve the original wording and terminology used in the resume`;
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -828,7 +1049,7 @@ ${resumeText}`;
           }
         ],
         temperature: 0.1,
-        max_tokens: 2000
+        max_tokens: 4000
       })
     });
 
@@ -839,21 +1060,77 @@ ${resumeText}`;
     const result = await response.json();
     const extractedData = JSON.parse(result.choices[0].message.content);
     
+    // Validate and clean the extracted data
+    const validatedData = validateAndCleanExtractedData(extractedData);
+    
     logSection('GPT extraction completed', { 
-      educationCount: extractedData.education.length,
-      experienceCount: extractedData.experience.length,
+      educationCount: validatedData.education.length,
+      experienceCount: validatedData.experience.length,
       skillsCount: {
-        technical: extractedData.skills.technical.length,
-        soft: extractedData.skills.soft.length,
-        industry: extractedData.skills.industry.length
+        technical: validatedData.skills.technical.length,
+        soft: validatedData.skills.soft.length,
+        industry: validatedData.skills.industry.length
       }
     });
 
-    return extractedData;
+    return validatedData;
   } catch (error) {
     logSection('GPT extraction failed', { error: error.message }, 'error');
     throw error;
   }
+}
+
+// Helper function to validate and clean extracted data
+function validateAndCleanExtractedData(data: any): ExtractedResumeData {
+  // Ensure all required fields exist
+  const cleanedData: ExtractedResumeData = {
+    contactInfo: {
+      name: data.contactInfo?.name?.trim() || '',
+      email: data.contactInfo?.email?.trim() || '',
+      phone: data.contactInfo?.phone?.trim() || '',
+      location: data.contactInfo?.location?.trim() || ''
+    },
+    education: [],
+    experience: [],
+    skills: {
+      technical: [],
+      soft: [],
+      industry: []
+    }
+  };
+
+  // Clean and validate education data
+  if (Array.isArray(data.education)) {
+    cleanedData.education = data.education.map((edu: any) => ({
+      institution: edu.institution?.trim() || '',
+      degree: edu.degree?.trim() || '',
+      field: edu.field?.trim() || '',
+      year: edu.year?.trim() || '',
+      gpa: edu.gpa?.trim() || ''
+    })).filter((edu: any) => edu.institution || edu.degree);
+  }
+
+  // Clean and validate experience data
+  if (Array.isArray(data.experience)) {
+    cleanedData.experience = data.experience.map((exp: any) => ({
+      company: exp.company?.trim() || '',
+      title: exp.title?.trim() || '',
+      startDate: exp.startDate?.trim() || '',
+      endDate: exp.endDate?.trim() || '',
+      description: exp.description?.trim() || ''
+    })).filter((exp: any) => exp.company || exp.title);
+  }
+
+  // Clean and validate skills data
+  if (data.skills) {
+    cleanedData.skills = {
+      technical: (data.skills.technical || []).map((skill: string) => skill.trim()).filter(Boolean),
+      soft: (data.skills.soft || []).map((skill: string) => skill.trim()).filter(Boolean),
+      industry: (data.skills.industry || []).map((skill: string) => skill.trim()).filter(Boolean)
+    };
+  }
+
+  return cleanedData;
 }
 
 // Add new function for the second GPT call to analyze against job description
@@ -871,7 +1148,7 @@ async function analyzeWithGPT(extractedData: ExtractedResumeData, jobDescription
     }
   });
 
-  const analysisPrompt = `Analyze this candidate's qualifications against the job description:
+  const analysisPrompt = `You are an expert recruitment analyst. Analyze this candidate's qualifications against the job description in detail.
 
 CANDIDATE QUALIFICATIONS:
 ${JSON.stringify(extractedData, null, 2)}
@@ -881,36 +1158,40 @@ ${jobDescription}
 
 Provide a detailed analysis in this format:
 {
-  "educationLevel": "list all education found",
-  "yearsExperience": "total years and breakdown",
-  "skillsMatch": "High/Medium/Low",
+  "educationLevel": "list all education found with details",
+  "yearsExperience": "total years and breakdown by role",
+  "skillsMatch": "High/Medium/Low with explanation",
   "keySkills": {
-    "technical": ["matching technical skills"],
-    "soft": ["matching soft skills"],
-    "industry": ["matching industry skills"]
+    "technical": ["matching technical skills with proficiency level"],
+    "soft": ["matching soft skills with examples"],
+    "industry": ["matching industry skills with relevance"]
   },
   "missingRequirements": {
-    "skills": ["missing skills"],
-    "qualifications": ["missing qualifications"],
-    "experience": ["missing experience"]
+    "skills": ["missing skills with importance level"],
+    "qualifications": ["missing qualifications with impact"],
+    "experience": ["missing experience with alternatives"]
   },
   "overallScore": number,
   "analysis": {
-    "strengths": ["list of strengths"],
-    "gaps": ["list of gaps"],
-    "recommendations": ["list of recommendations"]
+    "strengths": ["detailed list of candidate's strengths"],
+    "gaps": ["detailed list of gaps and their impact"],
+    "recommendations": ["specific recommendations for improvement"]
   }
 }
 
 Guidelines:
-1. Report ALL education information found
+1. Report ALL education information found with details
 2. Calculate years of experience from the provided experience data
 3. Match skills explicitly mentioned in both resume and job description
 4. List missing requirements based on job description
-5. Score based on explicit matches only
-6. Return a valid JSON object`;
+5. Score based on explicit matches and relevance
+6. Provide detailed analysis of strengths, gaps, and recommendations
+7. Return a valid JSON object`;
 
   try {
+    // Add delay before GPT call
+    await delay(500);
+    
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -922,7 +1203,7 @@ Guidelines:
         messages: [
           {
             role: 'system',
-            content: 'You are an expert recruitment analyst. Analyze the candidate\'s qualifications against the job requirements.'
+            content: 'You are an expert recruitment analyst. Analyze the candidate\'s qualifications against the job requirements in detail.'
           },
           {
             role: 'user',
@@ -930,7 +1211,7 @@ Guidelines:
           }
         ],
         temperature: 0.1,
-        max_tokens: 2000
+        max_tokens: 4000
       })
     });
 
@@ -1011,6 +1292,9 @@ serve(async (req) => {
         const { rawText, structuredData: extractedData } = await extractTextFromPDF(buffer);
         resumeText = rawText;
         structuredData = extractedData;
+        
+        // Add delay after PDF extraction
+        await delay(300);
       } else if (contentType?.includes('text')) {
         resumeText = new TextDecoder().decode(buffer);
       } else {
@@ -1072,8 +1356,14 @@ serve(async (req) => {
     // First stage: Extract structured data with GPT
     const extractedData = await extractStructuredDataWithGPT(resumeText);
     
+    // Add delay between extraction and analysis
+    await delay(500);
+    
     // Second stage: Analyze against job description
     const analysis = await analyzeWithGPT(extractedData, jobDescription);
+    
+    // Add delay before storing results
+    await delay(200);
     
     // Store results in database
     const { error: dbError } = await supabaseAdmin
