@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': process.env.NODE_ENV === 'production' 
-    ? 'https://recruitment-hub-navigator.vercel.app' 
-    : 'http://localhost:3000',
+  'Access-Control-Allow-Origin': '*', // Allow all origins in development
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Access-Control-Max-Age': '86400',
@@ -12,6 +10,10 @@ const corsHeaders = {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured');
+    }
     
     const response = await fetch('https://rtuzdeaxmpikwuvplcbh.supabase.co/functions/v1/analyze-resume', {
       method: 'POST',
@@ -23,7 +25,9 @@ export async function POST(request: Request) {
     });
 
     if (!response.ok) {
-      throw new Error(`Supabase Edge Function returned ${response.status}`);
+      const errorText = await response.text();
+      console.error('Supabase Edge Function error:', errorText);
+      throw new Error(`Supabase Edge Function returned ${response.status}: ${errorText}`);
     }
 
     const data = await response.json();
@@ -31,7 +35,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Error in analyze-resume proxy:', error);
     return NextResponse.json(
-      { error: 'Failed to analyze resume' },
+      { error: error instanceof Error ? error.message : 'Failed to analyze resume' },
       { 
         status: 500,
         headers: corsHeaders
