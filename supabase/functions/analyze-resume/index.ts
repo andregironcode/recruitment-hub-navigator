@@ -109,6 +109,22 @@ interface ExtractedResumeData {
   };
 }
 
+// Add proper type definitions
+interface LogData {
+  [key: string]: unknown;
+}
+
+interface AzureAnalysisResult {
+  status: string;
+  analyzeResult?: {
+    content: string;
+    keyValuePairs?: Array<{
+      key?: { content?: string };
+      value?: { content?: string };
+    }>;
+  };
+}
+
 // Helper function to detect resume sections
 function detectResumeSections(text: string): ResumeSection[] {
   const sections: ResumeSection[] = [];
@@ -350,8 +366,8 @@ function extractStructuredData(sections: ResumeSection[]): StructuredResumeData 
   return data;
 }
 
-// Add logging utility
-function logSection(title: string, data: any, level: 'info' | 'debug' | 'error' = 'info') {
+// Update the logSection function with proper typing
+function logSection(title: string, data: LogData, level: 'info' | 'debug' | 'error' = 'info'): void {
   const timestamp = new Date().toISOString();
   const logMessage = `[${timestamp}] ${title}: ${JSON.stringify(data, null, 2)}`;
   
@@ -446,133 +462,208 @@ async function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Azure Form Recognizer implementation
+// Azure AI Document Intelligence implementation
 async function extractTextFromPDF(pdfBuffer: ArrayBuffer): Promise<{ rawText: string; structuredData: StructuredResumeData }> {
-  const endpoint = process.env.AZURE_FORM_RECOGNIZER_ENDPOINT;
-  const key = process.env.AZURE_FORM_RECOGNIZER_KEY;
+  const endpoint = 'https://recruitment-hub-form-recognizer.cognitiveservices.azure.com/';
+  const key = '6Qdz0P48urbjuCNePfuj2BDlmrOSgNZxrGOOVe2SnTIiytHORq8KJQQJ99BDACYeBjFXJ3w3AAALACOGZR0C';
   
   if (!endpoint || !key) {
-    throw new Error('Azure Form Recognizer credentials not configured');
+    throw new Error('Azure Document Intelligence credentials not configured');
   }
 
   // Convert ArrayBuffer to base64
   const base64Data = btoa(String.fromCharCode(...new Uint8Array(pdfBuffer)));
 
-  // Call Azure Form Recognizer
-  const response = await fetch(`${endpoint}/formrecognizer/documentModels/prebuilt-document:analyze?api-version=2023-07-31`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Ocp-Apim-Subscription-Key': key
-    },
-    body: JSON.stringify({
-      base64Source: base64Data
-    })
-  });
-
-  if (!response.ok) {
-    throw new Error(`Azure Form Recognizer error: ${response.statusText}`);
-  }
-
-  const result = await response.json();
-  const operationLocation = response.headers.get('Operation-Location');
-
-  if (!operationLocation) {
-    throw new Error('No operation location returned from Azure Form Recognizer');
-  }
-
-  // Poll for results
-  let analysisResult: AzureFormRecognizerResponse | null = null;
-  for (let i = 0; i < 10; i++) {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const statusResponse = await fetch(operationLocation, {
+  try {
+    // Call Azure Document Intelligence with the correct model name
+    const response = await fetch(`${endpoint}formrecognizer/documentModels/prebuilt-document:analyze?api-version=2023-07-31`, {
+      method: 'POST',
       headers: {
+        'Content-Type': 'application/json',
         'Ocp-Apim-Subscription-Key': key
-      }
+      },
+      body: JSON.stringify({
+        base64Source: base64Data
+      })
     });
-    
-    const statusResult = await statusResponse.json() as AzureFormRecognizerResponse;
-    
-    if (statusResult.status === 'succeeded') {
-      analysisResult = statusResult;
-      break;
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Azure Document Intelligence error:', errorText);
+      throw new Error(`Azure Document Intelligence error: ${response.statusText}. Details: ${errorText}`);
     }
-  }
 
-  if (!analysisResult) {
-    throw new Error('Timeout waiting for Azure Form Recognizer analysis');
-  }
+    const result = await response.json();
+    const operationLocation = response.headers.get('Operation-Location');
 
-  // Process the results
-  const structuredData: StructuredResumeData = {
-    contactInfo: {},
-    education: [],
-    experience: [],
-    skills: {
-      technical: [],
-      soft: [],
-      industry: []
+    if (!operationLocation) {
+      throw new Error('No operation location returned from Azure Document Intelligence');
     }
-  };
 
-  // Extract contact information
-  const contactFields = analysisResult.analyzeResult.documentResults[0].fields;
-  structuredData.contactInfo = {
-    name: contactFields.Name?.value || '',
-    email: contactFields.Email?.value || '',
-    phone: contactFields.Phone?.value || '',
-    location: contactFields.Address?.value || ''
-  };
+    // Poll for results with better error handling
+    let analysisResult: any = null;
+    let retryCount = 0;
+    const maxRetries = 10;
+    const retryDelay = 1000; // 1 second
 
-  // Extract education
-  if (contactFields.Education?.valueArray) {
-    structuredData.education = contactFields.Education.valueArray.map(item => ({
-      institution: item.valueObject.School?.value || '',
-      degree: item.valueObject.Degree?.value || '',
-      field: item.valueObject.Field?.value || '',
-      year: item.valueObject.Year?.value || '',
-      gpa: item.valueObject.GPA?.value || ''
-    }));
-  }
-
-  // Extract experience
-  if (contactFields.Experience?.valueArray) {
-    structuredData.experience = contactFields.Experience.valueArray.map(item => ({
-      company: item.valueObject.Company?.value || '',
-      title: item.valueObject.Title?.value || '',
-      startDate: item.valueObject.StartDate?.value || '',
-      endDate: item.valueObject.EndDate?.value || '',
-      description: item.valueObject.Description?.value || ''
-    }));
-  }
-
-  // Extract skills
-  if (contactFields.Skills?.value) {
-    const skillsText = contactFields.Skills.value;
-    
-    // Categorize skills
-    const technicalKeywords = ['programming', 'language', 'framework', 'tool', 'software', 'system', 'database'];
-    const softKeywords = ['communication', 'leadership', 'team', 'problem', 'time', 'management'];
-    
-    const skillsList = skillsText.split(/[,;]/).map(skill => skill.trim());
-    
-    skillsList.forEach(skill => {
-      const lowerSkill = skill.toLowerCase();
-      if (technicalKeywords.some(keyword => lowerSkill.includes(keyword))) {
-        structuredData.skills.technical.push(skill);
-      } else if (softKeywords.some(keyword => lowerSkill.includes(keyword))) {
-        structuredData.skills.soft.push(skill);
-      } else {
-        structuredData.skills.industry.push(skill);
+    while (retryCount < maxRetries) {
+      try {
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        
+        const statusResponse = await fetch(operationLocation, {
+          headers: {
+            'Ocp-Apim-Subscription-Key': key
+          }
+        });
+        
+        if (!statusResponse.ok) {
+          throw new Error(`Failed to get analysis status: ${statusResponse.statusText}`);
+        }
+        
+        const statusResult = await statusResponse.json();
+        
+        if (statusResult.status === 'succeeded') {
+          analysisResult = statusResult;
+          break;
+        } else if (statusResult.status === 'failed') {
+          throw new Error(`Analysis failed: ${statusResult.error?.message || 'Unknown error'}`);
+        }
+        
+        retryCount++;
+      } catch (error) {
+        console.error('Error during polling:', error);
+        if (retryCount >= maxRetries - 1) {
+          throw error;
+        }
+        retryCount++;
       }
-    });
+    }
+
+    if (!analysisResult) {
+      throw new Error(`Timeout waiting for Azure Document Intelligence analysis after ${maxRetries} attempts`);
+    }
+
+    // Process the results
+    const structuredData: StructuredResumeData = {
+      contactInfo: {},
+      education: [],
+      experience: [],
+      skills: {
+        technical: [],
+        soft: [],
+        industry: []
+      }
+    };
+
+    // Extract raw text from the document
+    const rawText = analysisResult.analyzeResult.content;
+
+    // Extract structured data using the document's key-value pairs
+    const keyValuePairs = analysisResult.analyzeResult.keyValuePairs || [];
+    const contactFields: Record<string, string> = {};
+    
+    for (const pair of keyValuePairs) {
+      const key = pair.key?.content?.toLowerCase() || '';
+      const value = pair.value?.content || '';
+      
+      if (key.includes('name')) {
+        structuredData.contactInfo.name = value;
+      } else if (key.includes('email')) {
+        structuredData.contactInfo.email = value;
+      } else if (key.includes('phone')) {
+        structuredData.contactInfo.phone = value;
+      } else if (key.includes('address') || key.includes('location')) {
+        structuredData.contactInfo.location = value;
+      }
+    }
+
+    // Extract education information
+    const educationPattern = /(?:education|academic|qualification|degree|studies|university|college|school|institute|academy)/i;
+    const educationSections = rawText.split('\n').filter(line => educationPattern.test(line));
+    
+    for (const section of educationSections) {
+      const lines = section.split('\n');
+      for (const line of lines) {
+        if (line.match(/(?:bachelor|master|phd|doctorate|degree|diploma)/i)) {
+          const yearMatch = line.match(/\b(19|20)\d{2}\b/);
+          const year = yearMatch ? yearMatch[0] : '';
+          
+          structuredData.education.push({
+            institution: lines[0] || '',
+            degree: line,
+            field: '',
+            year,
+            gpa: ''
+          });
+          break;
+        }
+      }
+    }
+
+    // Extract experience information
+    const experiencePattern = /(?:experience|work|employment|career|professional)/i;
+    const experienceSections = rawText.split('\n').filter(line => experiencePattern.test(line));
+    
+    for (const section of experienceSections) {
+      const lines = section.split('\n');
+      let currentCompany = '';
+      let currentTitle = '';
+      let currentStartDate = '';
+      let currentEndDate = '';
+      let currentDescription = '';
+      
+      for (const line of lines) {
+        if (line.match(/\b(19|20)\d{2}\b/)) {
+          const dates = line.match(/\b(19|20)\d{2}\b/g);
+          if (dates && dates.length >= 2) {
+            currentStartDate = dates[0];
+            currentEndDate = dates[1];
+          }
+        } else if (!currentCompany) {
+          currentCompany = line;
+        } else if (!currentTitle) {
+          currentTitle = line;
+        } else {
+          currentDescription += line + '\n';
+        }
+      }
+      
+      if (currentCompany && currentTitle) {
+        structuredData.experience.push({
+          company: currentCompany,
+          title: currentTitle,
+          startDate: currentStartDate,
+          endDate: currentEndDate,
+          description: currentDescription.trim()
+        });
+      }
+    }
+
+    // Extract skills information
+    const skillsPattern = /(?:skills|expertise|competencies|technologies|technical skills|professional skills|core competencies|key skills|areas of expertise)/i;
+    const skillsSections = rawText.split('\n').filter(line => skillsPattern.test(line));
+    
+    for (const section of skillsSections) {
+      const lines = section.split('\n');
+      for (const line of lines) {
+        const skills = line.split(/[,;]/).map(skill => skill.trim());
+        for (const skill of skills) {
+          if (skill.match(/(?:programming|language|framework|tool|software|system|database)/i)) {
+            structuredData.skills.technical.push(skill);
+          } else if (skill.match(/(?:communication|leadership|team|problem|time|management)/i)) {
+            structuredData.skills.soft.push(skill);
+          } else {
+            structuredData.skills.industry.push(skill);
+          }
+        }
+      }
+    }
+
+    return { rawText, structuredData };
+  } catch (error) {
+    console.error('Error in Azure Document Intelligence processing:', error);
+    throw error;
   }
-
-  // Get raw text
-  const rawText = analysisResult.analyzeResult.content;
-
-  return { rawText, structuredData };
 }
 
 // Add education level detection function
@@ -866,7 +957,9 @@ function extractStructuredDataFromText(text: string): StructuredResumeData {
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Max-Age': '86400',
 };
 
 // Create a Supabase client with the service role key
@@ -880,8 +973,26 @@ async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function callOpenAIWithRetry(messages: any[], maxRetries = 3, initialDelay = 1000): Promise<any> {
-  let lastError;
+// Update the callOpenAIWithRetry function with proper typing
+interface OpenAIMessage {
+  role: string;
+  content: string;
+}
+
+interface OpenAIResponse {
+  choices: Array<{
+    message: {
+      content: string;
+    };
+  }>;
+}
+
+async function callOpenAIWithRetry(
+  messages: OpenAIMessage[], 
+  maxRetries = 3, 
+  initialDelay = 1000
+): Promise<OpenAIResponse> {
+  let lastError: Error | null = null;
   
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
@@ -900,7 +1011,6 @@ async function callOpenAIWithRetry(messages: any[], maxRetries = 3, initialDelay
       });
 
       if (response.status === 429) {
-        // Rate limit hit - calculate backoff time
         const retryAfter = response.headers.get('Retry-After') || '60';
         const delay = parseInt(retryAfter) * 1000;
         console.log(`Rate limit hit, waiting ${delay}ms before retry ${attempt + 1}/${maxRetries}`);
@@ -914,7 +1024,7 @@ async function callOpenAIWithRetry(messages: any[], maxRetries = 3, initialDelay
 
       return await response.json();
     } catch (error) {
-      lastError = error;
+      lastError = error instanceof Error ? error : new Error('Unknown error occurred');
       if (attempt < maxRetries - 1) {
         const delay = initialDelay * Math.pow(2, attempt);
         console.log(`Attempt ${attempt + 1} failed, retrying in ${delay}ms`);
@@ -1237,12 +1347,15 @@ Guidelines:
 
 // Update the main handler to use the new multi-stage processing
 serve(async (req) => {
-  try {
-    // Handle CORS preflight requests
-    if (req.method === 'OPTIONS') {
-      return new Response(null, { headers: corsHeaders });
-    }
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', {
+      headers: corsHeaders,
+      status: 200
+    });
+  }
 
+  try {
     const { resumeUrl, resumeContent, jobDescription, jobId, applicantId, forceUpdate } = await req.json();
     
     console.log(`Processing request with forceUpdate: ${forceUpdate}`);
@@ -1250,29 +1363,37 @@ serve(async (req) => {
     
     // Check for existing analysis first if we have an application ID
     if (applicantId && !forceUpdate) {
-      const { data: existingAnalysis, error: queryError } = await supabaseAdmin
-        .from('application_analyses')
-        .select('*')
-        .eq('application_id', applicantId)
-        .single();
-      
-      if (!queryError && existingAnalysis) {
-        console.log(`Found existing analysis for application ${applicantId}, returning it`);
+      try {
+        const { data: existingAnalysis, error: queryError } = await supabaseAdmin
+          .from('application_analyses')
+          .select('*')
+          .eq('application_id', applicantId)
+          .single();
         
-        return new Response(
-          JSON.stringify({
-            educationLevel: existingAnalysis.education_level,
-            yearsExperience: existingAnalysis.years_experience, 
-            skillsMatch: existingAnalysis.skills_match,
-            keySkills: existingAnalysis.key_skills,
-            missingRequirements: existingAnalysis.missing_requirements,
-            overallScore: existingAnalysis.overall_score,
-            fallback: existingAnalysis.fallback
-          }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          }
-        );
+        if (!queryError && existingAnalysis) {
+          console.log(`Found existing analysis for application ${applicantId}, returning it`);
+          
+          return new Response(
+            JSON.stringify({
+              educationLevel: existingAnalysis.education_level,
+              yearsExperience: existingAnalysis.years_experience, 
+              skillsMatch: existingAnalysis.skills_match,
+              keySkills: existingAnalysis.key_skills,
+              missingRequirements: existingAnalysis.missing_requirements,
+              overallScore: existingAnalysis.overall_score,
+              fallback: existingAnalysis.fallback
+            }),
+            {
+              headers: { 
+                'Content-Type': 'application/json',
+                ...corsHeaders
+              },
+            }
+          );
+        }
+      } catch (error) {
+        console.error('Error checking for existing analysis:', error);
+        // Continue with new analysis if there's an error
       }
     }
     
@@ -1281,24 +1402,29 @@ serve(async (req) => {
     let structuredData: StructuredResumeData | null = null;
 
     if (resumeUrl) {
-      const response = await fetch(resumeUrl);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch resume: ${response.statusText}`);
-      }
-      const contentType = response.headers.get('content-type');
-      const buffer = await response.arrayBuffer();
+      try {
+        const response = await fetch(resumeUrl);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch resume: ${response.statusText}`);
+        }
+        const contentType = response.headers.get('content-type');
+        const buffer = await response.arrayBuffer();
 
-      if (contentType?.includes('pdf')) {
-        const { rawText, structuredData: extractedData } = await extractTextFromPDF(buffer);
-        resumeText = rawText;
-        structuredData = extractedData;
-        
-        // Add delay after PDF extraction
-        await delay(300);
-      } else if (contentType?.includes('text')) {
-        resumeText = new TextDecoder().decode(buffer);
-      } else {
-        throw new Error('Unsupported file type. Please upload a PDF or text file.');
+        if (contentType?.includes('pdf')) {
+          const { rawText, structuredData: extractedData } = await extractTextFromPDF(buffer);
+          resumeText = rawText;
+          structuredData = extractedData;
+          
+          // Add delay after PDF extraction
+          await delay(300);
+        } else if (contentType?.includes('text')) {
+          resumeText = new TextDecoder().decode(buffer);
+        } else {
+          throw new Error('Unsupported file type. Please upload a PDF or text file.');
+        }
+      } catch (error) {
+        console.error('Error processing resume:', error);
+        throw new Error(`Error processing resume: ${error.message}`);
       }
     } else if (resumeContent) {
       resumeText = resumeContent;
@@ -1349,10 +1475,15 @@ serve(async (req) => {
       
       return new Response(
         JSON.stringify(fallbackAnalysis),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { 
+          headers: { 
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          } 
+        }
       );
     }
-    
+
     // First stage: Extract structured data with GPT
     const extractedData = await extractStructuredDataWithGPT(resumeText);
     
@@ -1389,10 +1520,15 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         analysis,
-        extractedData
+        extractedData,
+        rawText: resumeText,
+        structuredData
       }),
       {
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        },
         status: 200
       }
     );
@@ -1402,7 +1538,10 @@ serve(async (req) => {
       JSON.stringify({ error: error.message }),
       { 
         status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { 
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
       }
     );
   }

@@ -1,0 +1,48 @@
+import { NextResponse } from 'next/server';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': process.env.NODE_ENV === 'production' 
+    ? 'https://recruitment-hub-navigator.vercel.app' 
+    : 'http://localhost:3000',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Max-Age': '86400',
+};
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    
+    const response = await fetch('https://rtuzdeaxmpikwuvplcbh.supabase.co/functions/v1/analyze-resume', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Supabase Edge Function returned ${response.status}`);
+    }
+
+    const data = await response.json();
+    return NextResponse.json(data, { headers: corsHeaders });
+  } catch (error) {
+    console.error('Error in analyze-resume proxy:', error);
+    return NextResponse.json(
+      { error: 'Failed to analyze resume' },
+      { 
+        status: 500,
+        headers: corsHeaders
+      }
+    );
+  }
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: corsHeaders,
+  });
+} 
