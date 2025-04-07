@@ -18,7 +18,7 @@ const teamMembers = [
     bio: 'James oversees business development initiatives and strategic partnerships. With his background in finance and operations, he helps clients optimize their recruitment processes.'
   },
   {
-    name: 'MHairi',
+    name: 'Mhairi',
     role: 'Communications',
     image: '/lovable-uploads/4469be87-a336-4ab0-bd14-63e379979292.png',
     bio: 'MHairi leads our communications strategy, ensuring clear and consistent messaging across all channels. Her expertise in digital marketing has helped grow our brand presence.'
