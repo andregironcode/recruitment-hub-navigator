@@ -3,6 +3,7 @@ import React from 'react';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Award, Users, Target, Heart } from 'lucide-react';
+import TeamSection from '@/components/home/TeamSection';
 
 const About = () => {
   return (
@@ -129,46 +130,7 @@ const About = () => {
       </section>
 
       {/* Team section */}
-      <section className="py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-center mb-12 text-recruitment-dark">Our Leadership Team</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="bg-gray-200 w-48 h-48 rounded-full mx-auto mb-4 flex items-center justify-center">
-                <span className="text-recruitment-primary text-5xl font-light">JH</span>
-              </div>
-              <h3 className="text-xl font-semibold text-recruitment-dark">Jane Harries</h3>
-              <p className="text-recruitment-primary mb-2">Founder & CEO</p>
-              <p className="text-gray-600 max-w-xs mx-auto">
-                25+ years of recruitment and HR experience across multiple industries.
-              </p>
-            </div>
-            
-            <div className="text-center">
-              <div className="bg-gray-200 w-48 h-48 rounded-full mx-auto mb-4 flex items-center justify-center">
-                <span className="text-recruitment-primary text-5xl font-light">MT</span>
-              </div>
-              <h3 className="text-xl font-semibold text-recruitment-dark">Mark Thompson</h3>
-              <p className="text-recruitment-primary mb-2">Operations Director</p>
-              <p className="text-gray-600 max-w-xs mx-auto">
-                15+ years of experience in recruitment operations and business development.
-              </p>
-            </div>
-            
-            <div className="text-center">
-              <div className="bg-gray-200 w-48 h-48 rounded-full mx-auto mb-4 flex items-center justify-center">
-                <span className="text-recruitment-primary text-5xl font-light">SP</span>
-              </div>
-              <h3 className="text-xl font-semibold text-recruitment-dark">Sarah Patel</h3>
-              <p className="text-recruitment-primary mb-2">Technology Recruitment Lead</p>
-              <p className="text-gray-600 max-w-xs mx-auto">
-                Specialist in tech recruitment with expertise in AI and software development roles.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+      <TeamSection />
 
       {/* CTA Section */}
       <section className="py-16 bg-recruitment-primary text-white">
