@@ -133,13 +133,13 @@ const HeroBanner = () => {
               stiffness: 400,
               damping: 10
             }} src="/lovable-uploads/021fa15a-3949-4524-b569-7e955e57929e.png" />
-              <motion.img src="/client-logo-3.svg" alt="Client logo" className="h-7 opacity-60 hover:opacity-100 transition-opacity" whileHover={{
+              <motion.img alt="Client logo" className="h-7 opacity-60 hover:opacity-100 transition-opacity" whileHover={{
               scale: 1.1
             }} transition={{
               type: "spring",
               stiffness: 400,
               damping: 10
-            }} />
+            }} src="/lovable-uploads/78c565ab-9246-461b-9779-5b8936998b72.png" />
               <motion.img src="/client-logo-4.svg" alt="Client logo" className="h-7 opacity-60 hover:opacity-100 transition-opacity" whileHover={{
               scale: 1.1
             }} transition={{
