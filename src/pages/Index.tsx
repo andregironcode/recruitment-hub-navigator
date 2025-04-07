@@ -19,7 +19,6 @@ const Index = () => {
       <HeroBanner />
       <CompanyStats />
       <AboutSection />
-      <ServiceClusters />
       <RecentJobs />
       <IndustryCards />
       <TeamSection />
