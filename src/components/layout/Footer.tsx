@@ -1,13 +1,21 @@
+
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Phone, Mail, MapPin, Facebook, Twitter, Linkedin, Instagram } from 'lucide-react';
+
 const Footer = () => {
   return <footer className="bg-recruitment-primary text-white pt-12 pb-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Company Information */}
           <div>
-            <h3 className="text-xl font-bold mb-4">Harries Group</h3>
+            <div className="mb-4">
+              <img 
+                src="/lovable-uploads/7a05996b-c624-4b2e-aeec-d8203bd6de57.png" 
+                alt="Harries Group Logo" 
+                className="h-20 w-20 bg-white rounded-full p-1"
+              />
+            </div>
             <p className="mb-4">Building winning teams through specialist recruitment and talent acquisition since 2010.</p>
             <div className="flex space-x-4">
               <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="hover:text-recruitment-secondary transition-colors">
@@ -97,4 +105,5 @@ const Footer = () => {
       </div>
     </footer>;
 };
+
 export default Footer;
