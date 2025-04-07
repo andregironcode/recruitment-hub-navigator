@@ -45,7 +45,7 @@ const HeroBanner = () => {
             </div>
             
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-white">
-              <span className="text-white/90">The</span> Heather Harries <span className="text-white/90">Group</span>
+              <span className="text-white/90">The</span> Harries <span className="text-white/90">Group</span>
             </h1>
             
             <div className="h-16 mb-6 overflow-hidden">
