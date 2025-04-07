@@ -20,7 +20,7 @@ const teamMembers = [
   {
     name: 'MHairi',
     role: 'Communications',
-    image: '/lovable-uploads/d45d62a8-53c1-4063-8848-949a1f705344.png',
+    image: '/lovable-uploads/4469be87-a336-4ab0-bd14-63e379979292.png',
     bio: 'MHairi leads our communications strategy, ensuring clear and consistent messaging across all channels. Her expertise in digital marketing has helped grow our brand presence.'
   }
 ];
@@ -88,6 +88,12 @@ const TeamSection = () => {
                           <img 
                             src="/lovable-uploads/08380770-d0b9-4afb-90ce-7816e675abdf.png" 
                             alt="James"
+                            className="object-cover w-full h-full" 
+                          />
+                        ) : index === 2 ? (
+                          <img 
+                            src="/lovable-uploads/4469be87-a336-4ab0-bd14-63e379979292.png" 
+                            alt="MHairi"
                             className="object-cover w-full h-full" 
                           />
                         ) : (
