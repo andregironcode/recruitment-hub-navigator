@@ -10,6 +10,7 @@ import CompanyStats from '@/components/home/CompanyStats';
 import IndustryCards from '@/components/home/IndustryCards';
 import Testimonials from '@/components/home/Testimonials';
 import RecentJobs from '@/components/home/RecentJobs';
+import ValueProposition from '@/components/home/ValueProposition';
 
 const Index = () => {
   return (
@@ -17,6 +18,7 @@ const Index = () => {
       <HeroBanner />
       <CompanyStats />
       <AboutSection />
+      <ValueProposition />
       <RecentJobs />
       <IndustryCards />
       <TeamSection />

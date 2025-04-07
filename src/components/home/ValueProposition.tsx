@@ -105,9 +105,9 @@ const ValueProposition = () => {
                 Successful employees
               </h3>
               <motion.img 
-                src="/placeholder.svg" 
-                alt="Successful employees" 
-                className="w-full h-auto rounded-lg mb-6"
+                src="/lovable-uploads/55c7a32e-42dd-4bbd-be07-450a61145ce5.png" 
+                alt="Heather Harries, Founder" 
+                className="w-full h-auto rounded-lg mb-6 shadow-md"
                 whileHover={{ scale: 1.03 }}
                 transition={{ type: "spring", stiffness: 400, damping: 17 }}
               />
