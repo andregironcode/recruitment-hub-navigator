@@ -73,8 +73,8 @@ const AboutSection = () => {
             <div className="aspect-video bg-gradient-to-br from-recruitment-primary/10 to-recruitment-primary/30 rounded-2xl overflow-hidden shadow-lg relative">
               <div className="absolute inset-0 flex items-center justify-center">
                 <img 
-                  src="/placeholder.svg" 
-                  alt="Team collaboration" 
+                  src="https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2000&q=80" 
+                  alt="Team of professionals collaborating" 
                   className="w-full h-full object-cover"
                 />
               </div>
