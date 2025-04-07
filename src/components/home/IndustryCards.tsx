@@ -12,7 +12,7 @@ const industriesData = [
     id: 'finance', 
     name: 'Finance', 
     description: 'Banking, accounting, financial analysis, and senior finance leadership positions.',
-    icon: '/icons/finance.svg'
+    icon: '/icons/emiratization.svg'
   },
   { 
     id: 'emiratization', 
