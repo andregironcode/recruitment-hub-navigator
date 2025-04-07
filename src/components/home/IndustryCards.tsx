@@ -10,7 +10,7 @@ const industriesData = [
     id: 'finance', 
     name: 'Finance', 
     description: 'Banking, accounting, financial analysis, and senior finance leadership positions.',
-    jobCount: 36,
+    jobCount: 42,
     icon: '/icons/finance.svg'
   },
   { 
@@ -18,35 +18,35 @@ const industriesData = [
     name: 'Emiratization', 
     description: 'Specialized recruitment supporting UAE nationals in developing careers across all sectors.',
     jobCount: 28,
-    icon: '/icons/finance.svg' // Using finance icon as fallback
+    icon: '/icons/emiratization.svg'
   },
   { 
     id: 'real-estate', 
     name: 'Real Estate', 
     description: 'Property management, real estate agents, development, and construction specialists.',
-    jobCount: 31,
-    icon: '/icons/engineering.svg' // Using engineering icon as fallback
+    jobCount: 35,
+    icon: '/icons/real-estate.svg'
   },
   { 
     id: 'law', 
     name: 'Law', 
     description: 'Legal professionals, paralegals, attorneys, and corporate legal advisors.',
-    jobCount: 25,
-    icon: '/icons/executive.svg' // Using executive icon as fallback
+    jobCount: 24,
+    icon: '/icons/law.svg'
   },
   { 
     id: 'tourism', 
     name: 'Tourism', 
     description: 'Hospitality, travel management, tourism operations, and customer service roles.',
-    jobCount: 42,
-    icon: '/icons/marketing.svg' // Using marketing icon as fallback
+    jobCount: 38,
+    icon: '/icons/tourism.svg'
   },
   { 
     id: 'education', 
     name: 'Education', 
     description: 'Teaching professionals, educational administration, and academic leadership positions.',
-    jobCount: 33,
-    icon: '/icons/manufacturing.svg' // Using manufacturing icon as fallback
+    jobCount: 31,
+    icon: '/icons/education.svg'
   }
 ];
 
