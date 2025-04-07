@@ -14,7 +14,7 @@ const teamMembers = [
   {
     name: 'James',
     role: 'Business Development',
-    image: '/lovable-uploads/2d3ad749-e103-44a2-9866-34d4b50eec73.png',
+    image: '/lovable-uploads/08380770-d0b9-4afb-90ce-7816e675abdf.png',
     bio: 'James oversees business development initiatives and strategic partnerships. With his background in finance and operations, he helps clients optimize their recruitment processes.'
   },
   {
@@ -82,6 +82,12 @@ const TeamSection = () => {
                           <img 
                             src="/lovable-uploads/55c7a32e-42dd-4bbd-be07-450a61145ce5.png" 
                             alt="Heather"
+                            className="object-cover w-full h-full" 
+                          />
+                        ) : index === 1 ? (
+                          <img 
+                            src="/lovable-uploads/08380770-d0b9-4afb-90ce-7816e675abdf.png" 
+                            alt="James"
                             className="object-cover w-full h-full" 
                           />
                         ) : (
