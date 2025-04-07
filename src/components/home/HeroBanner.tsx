@@ -1,33 +1,20 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ArrowRight, ChevronDown, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
-
-const rotatingPhrases = [
-  "Transform your workforce", 
-  "Find top talent", 
-  "Grow your business", 
-  "Innovate with experts", 
-  "Build diverse teams"
-];
-
+const rotatingPhrases = ["Transform your workforce", "Find top talent", "Grow your business", "Innovate with experts", "Build diverse teams"];
 const HeroBanner = () => {
   const isMobile = useIsMobile();
   const [phraseIndex, setPhraseIndex] = useState(0);
-  
   useEffect(() => {
     const interval = setInterval(() => {
-      setPhraseIndex((prev) => (prev + 1) % rotatingPhrases.length);
+      setPhraseIndex(prev => (prev + 1) % rotatingPhrases.length);
     }, 3000);
-    
     return () => clearInterval(interval);
   }, []);
-  
-  return (
-    <div className="relative overflow-hidden bg-gradient-to-br from-recruitment-primary via-[#5d2a4c] to-recruitment-secondary">
+  return <div className="relative overflow-hidden bg-gradient-to-br from-recruitment-primary via-[#5d2a4c] to-recruitment-secondary">
       {/* Animated background elements */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute top-0 left-0 w-full h-full">
@@ -44,12 +31,15 @@ const HeroBanner = () => {
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="pt-20 pb-24 md:pt-28 md:pb-32 flex justify-center">
-          <motion.div 
-            className="max-w-3xl text-center"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
+          <motion.div className="max-w-3xl text-center" initial={{
+          opacity: 0,
+          y: 20
+        }} animate={{
+          opacity: 1,
+          y: 0
+        }} transition={{
+          duration: 0.6
+        }}>
             <div className="inline-block mb-2 px-3 py-1 bg-white/10 backdrop-blur-sm rounded-full text-white/90 text-sm font-medium">
               Leading Recruitment Solutions Since 2010
             </div>
@@ -59,14 +49,18 @@ const HeroBanner = () => {
             </h1>
             
             <div className="h-16 mb-6 overflow-hidden">
-              <motion.div
-                key={phraseIndex}
-                initial={{ y: 40, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: -40, opacity: 0 }}
-                transition={{ duration: 0.4 }}
-                className="text-2xl md:text-3xl font-medium text-white/90"
-              >
+              <motion.div key={phraseIndex} initial={{
+              y: 40,
+              opacity: 0
+            }} animate={{
+              y: 0,
+              opacity: 1
+            }} exit={{
+              y: -40,
+              opacity: 0
+            }} transition={{
+              duration: 0.4
+            }} className="text-2xl md:text-3xl font-medium text-white/90">
                 {rotatingPhrases[phraseIndex]}
               </motion.div>
             </div>
@@ -106,11 +100,13 @@ const HeroBanner = () => {
         </div>
         
         {/* Scroll indicator - centered with text-center class */}
-        <motion.div 
-          className="absolute bottom-8 left-0 right-0 mx-auto text-center flex flex-col items-center text-white/60"
-          animate={{ y: [0, 10, 0] }}
-          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-        >
+        <motion.div className="absolute bottom-8 left-0 right-0 mx-auto text-center flex flex-col items-center text-white/60" animate={{
+        y: [0, 10, 0]
+      }} transition={{
+        duration: 2,
+        repeat: Infinity,
+        ease: "easeInOut"
+      }}>
           <span className="text-sm mb-2">Scroll to explore</span>
           <ChevronDown className="h-5 w-5" />
         </motion.div>
@@ -123,40 +119,38 @@ const HeroBanner = () => {
               In a world where people have become numbers, our customers are our strategic partners, and their success is our success.
             </p>
             <div className="flex flex-wrap justify-center gap-8 md:gap-12">
-              <motion.img 
-                src="/client-logo-1.svg" 
-                alt="Client logo" 
-                className="h-7 opacity-60 hover:opacity-100 transition-opacity" 
-                whileHover={{ scale: 1.1 }}
-                transition={{ type: "spring", stiffness: 400, damping: 10 }}
-              />
-              <motion.img 
-                src="/client-logo-2.svg" 
-                alt="Client logo" 
-                className="h-7 opacity-60 hover:opacity-100 transition-opacity"
-                whileHover={{ scale: 1.1 }}
-                transition={{ type: "spring", stiffness: 400, damping: 10 }}
-              />
-              <motion.img 
-                src="/client-logo-3.svg" 
-                alt="Client logo" 
-                className="h-7 opacity-60 hover:opacity-100 transition-opacity"
-                whileHover={{ scale: 1.1 }}
-                transition={{ type: "spring", stiffness: 400, damping: 10 }}
-              />
-              <motion.img 
-                src="/client-logo-4.svg" 
-                alt="Client logo" 
-                className="h-7 opacity-60 hover:opacity-100 transition-opacity"
-                whileHover={{ scale: 1.1 }}
-                transition={{ type: "spring", stiffness: 400, damping: 10 }}
-              />
+              <motion.img alt="Client logo" className="h-7 opacity-60 hover:opacity-100 transition-opacity" whileHover={{
+              scale: 1.1
+            }} transition={{
+              type: "spring",
+              stiffness: 400,
+              damping: 10
+            }} src="/lovable-uploads/e118c610-9149-4c9c-850d-e0fc1a200ded.png" />
+              <motion.img alt="Client logo" className="h-7 opacity-60 hover:opacity-100 transition-opacity" whileHover={{
+              scale: 1.1
+            }} transition={{
+              type: "spring",
+              stiffness: 400,
+              damping: 10
+            }} src="/lovable-uploads/021fa15a-3949-4524-b569-7e955e57929e.png" />
+              <motion.img src="/client-logo-3.svg" alt="Client logo" className="h-7 opacity-60 hover:opacity-100 transition-opacity" whileHover={{
+              scale: 1.1
+            }} transition={{
+              type: "spring",
+              stiffness: 400,
+              damping: 10
+            }} />
+              <motion.img src="/client-logo-4.svg" alt="Client logo" className="h-7 opacity-60 hover:opacity-100 transition-opacity" whileHover={{
+              scale: 1.1
+            }} transition={{
+              type: "spring",
+              stiffness: 400,
+              damping: 10
+            }} />
             </div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>;
 };
-
 export default HeroBanner;
