@@ -139,7 +139,7 @@ const HeroBanner = () => {
               type: "spring",
               stiffness: 400,
               damping: 10
-            }} />
+            }} src="/lovable-uploads/021fa15a-3949-4524-b569-7e955e57929e.png" />
             </div>
           </div>
         </div>
