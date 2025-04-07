@@ -78,7 +78,15 @@ const TeamSection = () => {
                         className="object-cover w-full h-full" 
                       />
                       <AvatarFallback className="bg-recruitment-primary/10 text-recruitment-primary text-lg">
-                        {member.name.substring(0, 2).toUpperCase()}
+                        {index === 0 ? (
+                          <img 
+                            src="/lovable-uploads/55c7a32e-42dd-4bbd-be07-450a61145ce5.png" 
+                            alt="Heather"
+                            className="object-cover w-full h-full" 
+                          />
+                        ) : (
+                          member.name.substring(0, 2).toUpperCase()
+                        )}
                       </AvatarFallback>
                     </Avatar>
                   </motion.div>
@@ -110,7 +118,7 @@ const TeamSection = () => {
         >
           <div className="md:w-1/3 mb-6 md:mb-0 flex justify-center">
             <motion.img 
-              src={teamMembers[0].image}
+              src="/lovable-uploads/55c7a32e-42dd-4bbd-be07-450a61145ce5.png"
               alt="Heather Harries" 
               className="rounded-lg max-w-full h-auto md:max-w-xs"
               whileHover={{ scale: 1.05 }}
