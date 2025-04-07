@@ -1,57 +1,95 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { supabase } from '@/integrations/supabase/client';
 
+// Define our industry data but without hardcoded counts
 const industriesData = [
   { 
     id: 'finance', 
     name: 'Finance', 
     description: 'Banking, accounting, financial analysis, and senior finance leadership positions.',
-    jobCount: 42,
     icon: '/icons/finance.svg'
   },
   { 
     id: 'emiratization', 
     name: 'Emiratization', 
     description: 'Specialized recruitment supporting UAE nationals in developing careers across all sectors.',
-    jobCount: 28,
     icon: '/icons/emiratization.svg'
   },
   { 
     id: 'real-estate', 
     name: 'Real Estate', 
     description: 'Property management, real estate agents, development, and construction specialists.',
-    jobCount: 35,
     icon: '/icons/real-estate.svg'
   },
   { 
     id: 'law', 
     name: 'Law', 
     description: 'Legal professionals, paralegals, attorneys, and corporate legal advisors.',
-    jobCount: 24,
     icon: '/icons/law.svg'
   },
   { 
     id: 'tourism', 
     name: 'Tourism', 
     description: 'Hospitality, travel management, tourism operations, and customer service roles.',
-    jobCount: 38,
     icon: '/icons/tourism.svg'
   },
   { 
     id: 'education', 
     name: 'Education', 
     description: 'Teaching professionals, educational administration, and academic leadership positions.',
-    jobCount: 31,
     icon: '/icons/education.svg'
   }
 ];
 
 const IndustryCards = () => {
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
+  const [industries, setIndustries] = useState<Array<typeof industriesData[0] & { jobCount: number }>>(
+    industriesData.map(industry => ({ ...industry, jobCount: 0 }))
+  );
+  const [isLoading, setIsLoading] = useState(true);
+  
+  useEffect(() => {
+    const fetchJobCounts = async () => {
+      setIsLoading(true);
+      try {
+        // Prepare an array to store all industry counts
+        const industriesWithCounts = await Promise.all(
+          industriesData.map(async (industry) => {
+            // For each industry, count the number of jobs in that category
+            const { count, error } = await supabase
+              .from('jobs')
+              .select('*', { count: 'exact', head: true })
+              .eq('industry', industry.name);
+              
+            if (error) {
+              console.error(`Error fetching count for ${industry.name}:`, error);
+              return { ...industry, jobCount: 0 };
+            }
+            
+            return {
+              ...industry,
+              jobCount: count || 0
+            };
+          })
+        );
+        
+        setIndustries(industriesWithCounts);
+      } catch (error) {
+        console.error('Error fetching job counts:', error);
+        // If there's an error, use the industries with zero counts
+        setIndustries(industriesData.map(industry => ({ ...industry, jobCount: 0 })));
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchJobCounts();
+  }, []);
   
   return (
     <section className="py-16 md:py-24 bg-white">
@@ -72,7 +110,7 @@ const IndustryCards = () => {
         </motion.div>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-          {industriesData.map((industry, index) => (
+          {industries.map((industry, index) => (
             <motion.div
               key={industry.id}
               initial={{ opacity: 0, y: 20 }}
@@ -110,7 +148,7 @@ const IndustryCards = () => {
                     </p>
                     <div className="flex justify-between items-center mt-auto">
                       <span className="font-medium text-recruitment-accent">
-                        {industry.jobCount} openings
+                        {isLoading ? 'Loading...' : `${industry.jobCount} opening${industry.jobCount !== 1 ? 's' : ''}`}
                       </span>
                       <motion.span 
                         className="text-recruitment-primary"
