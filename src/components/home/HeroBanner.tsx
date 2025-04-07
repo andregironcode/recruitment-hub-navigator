@@ -43,9 +43,9 @@ const HeroBanner = () => {
       </div>
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="pt-20 pb-24 md:pt-28 md:pb-32 flex flex-col md:flex-row items-center">
+        <div className="pt-20 pb-24 md:pt-28 md:pb-32 flex justify-center">
           <motion.div 
-            className="md:w-1/2 text-center md:text-left mb-12 md:mb-0"
+            className="max-w-3xl text-center"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
@@ -71,11 +71,11 @@ const HeroBanner = () => {
               </motion.div>
             </div>
             
-            <p className="text-lg md:text-xl text-white/80 mb-8 max-w-lg mx-auto md:mx-0">
+            <p className="text-lg md:text-xl text-white/80 mb-8 mx-auto">
               Business disrupter and innovator, delivering exceptional recruitment solutions with old-fashioned values.
             </p>
             
-            <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link to="/about">
                 <Button size={isMobile ? "default" : "lg"} className="bg-white text-recruitment-primary hover:bg-gray-100 font-medium w-full sm:w-auto group">
                   Learn More <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
@@ -88,7 +88,7 @@ const HeroBanner = () => {
               </Link>
             </div>
             
-            <div className="mt-8 flex flex-wrap justify-center md:justify-start gap-4 text-white/80">
+            <div className="mt-8 flex flex-wrap justify-center gap-4 text-white/80">
               <div className="flex items-center">
                 <CheckCircle className="mr-2 h-5 w-5 text-recruitment-accent" />
                 <span>Award-winning</span>
@@ -101,24 +101,6 @@ const HeroBanner = () => {
                 <CheckCircle className="mr-2 h-5 w-5 text-recruitment-accent" />
                 <span>Personalized service</span>
               </div>
-            </div>
-          </motion.div>
-          
-          <motion.div 
-            className="md:w-1/2 flex justify-center md:justify-end"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-          >
-            <div className="relative">
-              <div className="absolute inset-0 bg-recruitment-accent rounded-full blur-3xl opacity-20"></div>
-              <motion.img 
-                src="/recruitment-hero.svg" 
-                alt="Professional recruitment" 
-                className="relative z-10 max-w-full h-auto lg:max-w-lg"
-                animate={{ y: [0, -10, 0] }}
-                transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-              />
             </div>
           </motion.div>
         </div>
