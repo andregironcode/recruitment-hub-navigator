@@ -82,7 +82,7 @@ const HeroBanner = () => {
                 </Button>
               </Link>
               <Link to="/contact">
-                <Button size={isMobile ? "default" : "lg"} variant="outline" className="border-white text-white hover:bg-white/10 font-medium w-full sm:w-auto">
+                <Button size={isMobile ? "default" : "lg"} variant="outline" className="border-white text-white bg-recruitment-accent/20 hover:bg-recruitment-accent hover:border-recruitment-accent font-medium w-full sm:w-auto">
                   Contact Us
                 </Button>
               </Link>
