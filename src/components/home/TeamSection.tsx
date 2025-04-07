@@ -8,20 +8,20 @@ const teamMembers = [
   {
     name: 'Heather',
     role: 'Chief Executive Officer',
-    image: '/placeholder.svg',
+    image: '/lovable-uploads/357969b6-4cae-4ff9-b23d-44173d7d2def.png',
     bio: 'Heather has over 20 years of experience in recruitment and education. She founded the Heather Harries Group with a vision to transform how businesses approach talent acquisition.'
-  },
-  {
-    name: 'MHairi',
-    role: 'Communications',
-    image: '/placeholder.svg',
-    bio: 'MHairi leads our communications strategy, ensuring clear and consistent messaging across all channels. Her expertise in digital marketing has helped grow our brand presence.'
   },
   {
     name: 'James',
     role: 'Business Development',
-    image: '/placeholder.svg',
+    image: '/lovable-uploads/2d3ad749-e103-44a2-9866-34d4b50eec73.png',
     bio: 'James oversees business development initiatives and strategic partnerships. With his background in finance and operations, he helps clients optimize their recruitment processes.'
+  },
+  {
+    name: 'MHairi',
+    role: 'Communications',
+    image: '/lovable-uploads/d45d62a8-53c1-4063-8848-949a1f705344.png',
+    bio: 'MHairi leads our communications strategy, ensuring clear and consistent messaging across all channels. Her expertise in digital marketing has helped grow our brand presence.'
   }
 ];
 
@@ -71,8 +71,12 @@ const TeamSection = () => {
                     whileHover={{ scale: 1.05 }}
                     transition={{ type: "spring", stiffness: 400, damping: 17 }}
                   >
-                    <Avatar className="h-24 w-24">
-                      <AvatarImage src={member.image} alt={member.name} />
+                    <Avatar className="h-24 w-24 rounded-full overflow-hidden">
+                      <AvatarImage 
+                        src={member.image} 
+                        alt={member.name}
+                        className="object-cover w-full h-full" 
+                      />
                       <AvatarFallback className="bg-recruitment-primary/10 text-recruitment-primary text-lg">
                         {member.name.substring(0, 2).toUpperCase()}
                       </AvatarFallback>
@@ -106,8 +110,8 @@ const TeamSection = () => {
         >
           <div className="md:w-1/3 mb-6 md:mb-0 flex justify-center">
             <motion.img 
-              src="/placeholder.svg" 
-              alt="Happy Company Employees" 
+              src={teamMembers[0].image}
+              alt="Heather Harries" 
               className="rounded-lg max-w-full h-auto md:max-w-xs"
               whileHover={{ scale: 1.05 }}
               transition={{ type: "spring", stiffness: 400, damping: 17 }}
