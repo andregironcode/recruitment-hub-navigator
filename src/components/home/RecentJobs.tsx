@@ -1,61 +1,102 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { MapPin, Briefcase, PoundSterling, Clock, ArrowRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { motion } from 'framer-motion';
-
-// Mock data - in a real app, this would come from an API
-const recentJobs = [
-  {
-    id: 'job1',
-    title: 'Senior Software Engineer',
-    company: 'TechSolutions Ltd',
-    location: 'London',
-    salary: '£70,000 - £85,000',
-    type: 'Full-time',
-    posted: '2 days ago',
-    category: 'technology',
-    featured: true
-  },
-  {
-    id: 'job2',
-    title: 'Finance Manager',
-    company: 'Global Finance Group',
-    location: 'Manchester',
-    salary: '£55,000 - £65,000',
-    type: 'Full-time',
-    posted: '3 days ago',
-    category: 'finance',
-    featured: false
-  },
-  {
-    id: 'job3',
-    title: 'Marketing Director',
-    company: 'Creative Brands',
-    location: 'Bristol',
-    salary: '£65,000 - £80,000',
-    type: 'Full-time',
-    posted: '1 week ago',
-    category: 'sales',
-    featured: true
-  },
-  {
-    id: 'job4',
-    title: 'Mechanical Engineer',
-    company: 'Engineering Solutions',
-    location: 'Birmingham',
-    salary: '£45,000 - £55,000',
-    type: 'Contract',
-    posted: '5 days ago',
-    category: 'engineering',
-    featured: false
-  }
-];
+import { supabase } from '@/integrations/supabase/client';
+import { Job } from '@/components/jobs/JobList';
+import { useToast } from '@/components/ui/use-toast';
 
 const RecentJobs = () => {
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const fetchJobs = async () => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('jobs')
+          .select('*')
+          .order('posted_date', { ascending: false })
+          .limit(4);
+
+        if (error) {
+          throw error;
+        }
+
+        // Map the database results to our Job type
+        const formattedJobs: Job[] = data.map(job => ({
+          id: job.id,
+          title: job.title,
+          company: job.company,
+          location: job.location,
+          salary: job.salary || '',
+          jobType: job.job_type,
+          industry: job.industry,
+          description: job.description,
+          postedDate: job.posted_date ? new Date(job.posted_date).toLocaleDateString() : 'Today',
+          featured: job.featured || false
+        }));
+
+        setJobs(formattedJobs);
+      } catch (error) {
+        console.error('Error fetching jobs:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load job listings. Please try again later.',
+          variant: 'destructive'
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchJobs();
+  }, [toast]);
+
+  if (isLoading) {
+    return (
+      <section className="py-16 md:py-24 bg-gradient-to-br from-recruitment-light to-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <h2 className="text-3xl md:text-4xl font-bold text-recruitment-primary mb-4">
+              Loading Latest Jobs...
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+              {[1, 2, 3, 4].map((index) => (
+                <Card key={index} className="h-full opacity-50 animate-pulse">
+                  <CardContent className="p-6 h-48"></CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (jobs.length === 0) {
+    return (
+      <section className="py-16 md:py-24 bg-gradient-to-br from-recruitment-light to-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <h2 className="text-3xl md:text-4xl font-bold text-recruitment-primary mb-4">
+              No Jobs Available
+            </h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto mb-8">
+              Check back soon for new job listings.
+            </p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="py-16 md:py-24 bg-gradient-to-br from-recruitment-light to-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -111,7 +152,7 @@ const RecentJobs = () => {
         </motion.div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {recentJobs.map((job, index) => (
+          {jobs.map((job, index) => (
             <motion.div
               key={job.id}
               initial={{ opacity: 0, y: 20 }}
@@ -142,7 +183,7 @@ const RecentJobs = () => {
                       </div>
                       <div className="flex items-center text-gray-600">
                         <Briefcase className="mr-2 h-4 w-4 text-gray-400" />
-                        <span>{job.type}</span>
+                        <span>{job.jobType}</span>
                       </div>
                       <div className="flex items-center text-gray-600">
                         <PoundSterling className="mr-2 h-4 w-4 text-gray-400" />
@@ -150,7 +191,7 @@ const RecentJobs = () => {
                       </div>
                       <div className="flex items-center text-gray-600">
                         <Clock className="mr-2 h-4 w-4 text-gray-400" />
-                        <span>{job.posted}</span>
+                        <span>{job.postedDate}</span>
                       </div>
                     </div>
                     
