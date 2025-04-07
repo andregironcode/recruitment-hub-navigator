@@ -105,9 +105,9 @@ const HeroBanner = () => {
           </motion.div>
         </div>
         
-        {/* Scroll indicator */}
+        {/* Scroll indicator - centered with text-center class */}
         <motion.div 
-          className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex flex-col items-center text-white/60"
+          className="absolute bottom-8 left-0 right-0 mx-auto text-center flex flex-col items-center text-white/60"
           animate={{ y: [0, 10, 0] }}
           transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
         >

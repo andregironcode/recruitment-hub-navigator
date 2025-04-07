@@ -7,46 +7,46 @@ import { motion } from 'framer-motion';
 
 const industriesData = [
   { 
-    id: 'technology', 
-    name: 'Technology', 
-    description: 'Software development, IT support, cybersecurity, and technical leadership roles.',
-    jobCount: 42,
-    icon: '/icons/technology.svg'
-  },
-  { 
     id: 'finance', 
-    name: 'Finance & Accounting', 
+    name: 'Finance', 
     description: 'Banking, accounting, financial analysis, and senior finance leadership positions.',
     jobCount: 36,
     icon: '/icons/finance.svg'
   },
   { 
-    id: 'engineering', 
-    name: 'Engineering', 
-    description: 'Civil, mechanical, electrical engineering and technical design positions.',
-    jobCount: 31,
-    icon: '/icons/engineering.svg'
-  },
-  { 
-    id: 'sales', 
-    name: 'Sales & Marketing', 
-    description: 'Sales executives, digital marketing specialists, and brand management roles.',
+    id: 'emiratization', 
+    name: 'Emiratization', 
+    description: 'Specialized recruitment supporting UAE nationals in developing careers across all sectors.',
     jobCount: 28,
-    icon: '/icons/marketing.svg'
+    icon: '/icons/finance.svg' // Using finance icon as fallback
   },
   { 
-    id: 'executive', 
-    name: 'Executive Search', 
-    description: 'C-suite, senior leadership, and board-level appointments across industries.',
-    jobCount: 22,
-    icon: '/icons/executive.svg'
+    id: 'real-estate', 
+    name: 'Real Estate', 
+    description: 'Property management, real estate agents, development, and construction specialists.',
+    jobCount: 31,
+    icon: '/icons/engineering.svg' // Using engineering icon as fallback
   },
   { 
-    id: 'manufacturing', 
-    name: 'Manufacturing', 
-    description: 'Production management, quality control, and operations leadership positions.',
-    jobCount: 24,
-    icon: '/icons/manufacturing.svg'
+    id: 'law', 
+    name: 'Law', 
+    description: 'Legal professionals, paralegals, attorneys, and corporate legal advisors.',
+    jobCount: 25,
+    icon: '/icons/executive.svg' // Using executive icon as fallback
+  },
+  { 
+    id: 'tourism', 
+    name: 'Tourism', 
+    description: 'Hospitality, travel management, tourism operations, and customer service roles.',
+    jobCount: 42,
+    icon: '/icons/marketing.svg' // Using marketing icon as fallback
+  },
+  { 
+    id: 'education', 
+    name: 'Education', 
+    description: 'Teaching professionals, educational administration, and academic leadership positions.',
+    jobCount: 33,
+    icon: '/icons/manufacturing.svg' // Using manufacturing icon as fallback
   }
 ];
 
