@@ -14,7 +14,158 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      application_analyses: {
+        Row: {
+          application_id: number
+          created_at: string
+          education_level: string | null
+          fallback: boolean | null
+          id: number
+          key_skills: string[] | null
+          missing_requirements: string[] | null
+          overall_score: number | null
+          skills_match: string | null
+          years_experience: number | null
+        }
+        Insert: {
+          application_id: number
+          created_at?: string
+          education_level?: string | null
+          fallback?: boolean | null
+          id?: number
+          key_skills?: string[] | null
+          missing_requirements?: string[] | null
+          overall_score?: number | null
+          skills_match?: string | null
+          years_experience?: number | null
+        }
+        Update: {
+          application_id?: number
+          created_at?: string
+          education_level?: string | null
+          fallback?: boolean | null
+          id?: number
+          key_skills?: string[] | null
+          missing_requirements?: string[] | null
+          overall_score?: number | null
+          skills_match?: string | null
+          years_experience?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "application_analyses_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: true
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      applications: {
+        Row: {
+          applicant_name: string
+          cover_letter: string | null
+          created_at: string
+          date_applied: string
+          email: string
+          id: number
+          job_id: number
+          job_title: string
+          phone: string | null
+          resume_url: string | null
+          status: string | null
+        }
+        Insert: {
+          applicant_name: string
+          cover_letter?: string | null
+          created_at?: string
+          date_applied?: string
+          email: string
+          id?: number
+          job_id: number
+          job_title: string
+          phone?: string | null
+          resume_url?: string | null
+          status?: string | null
+        }
+        Update: {
+          applicant_name?: string
+          cover_letter?: string | null
+          created_at?: string
+          date_applied?: string
+          email?: string
+          id?: number
+          job_id?: number
+          job_title?: string
+          phone?: string | null
+          resume_url?: string | null
+          status?: string | null
+        }
+        Relationships: []
+      }
+      job_categories: {
+        Row: {
+          created_at: string
+          description: string
+          id: number
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: number
+          name: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: number
+          name?: string
+        }
+        Relationships: []
+      }
+      jobs: {
+        Row: {
+          company: string
+          created_at: string
+          description: string
+          featured: boolean | null
+          id: number
+          industry: string
+          job_type: string
+          location: string
+          posted_date: string
+          salary: string | null
+          title: string
+        }
+        Insert: {
+          company: string
+          created_at?: string
+          description: string
+          featured?: boolean | null
+          id?: number
+          industry: string
+          job_type: string
+          location: string
+          posted_date?: string
+          salary?: string | null
+          title: string
+        }
+        Update: {
+          company?: string
+          created_at?: string
+          description?: string
+          featured?: boolean | null
+          id?: number
+          industry?: string
+          job_type?: string
+          location?: string
+          posted_date?: string
+          salary?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
