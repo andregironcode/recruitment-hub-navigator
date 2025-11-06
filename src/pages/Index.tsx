@@ -21,7 +21,6 @@ const Index = () => {
       <RecentJobs />
       <IndustryCards />
       <TeamSection />
-      <Testimonials />
       <VisionSection />
       <CallToAction />
     </Layout>

@@ -38,7 +38,7 @@ const CallToAction = () => {
               <h2 className="text-3xl md:text-4xl font-bold mb-4 text-recruitment-primary">
                 Ready to Transform Your Business?
               </h2>
-              <p className="text-lg text-gray-600 mb-6">Partner with the Harries Group to find exceptional talent that will drive your business forward. Our team of specialists is ready to help you achieve your goals.</p>
+              <p className="text-lg text-gray-600 mb-6">Partner with Harries Recruit to find exceptional talent that will drive your business forward. Our team of specialists is ready to help you achieve your goals.</p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Link to="/about" className="w-full sm:w-auto">
                   <motion.div whileHover={{

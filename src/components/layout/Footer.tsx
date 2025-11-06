@@ -12,7 +12,7 @@ const Footer = () => {
             <div className="mb-4">
               <img 
                 src="/lovable-uploads/7a05996b-c624-4b2e-aeec-d8203bd6de57.png" 
-                alt="Harries Group Logo" 
+                alt="Harries Recruit Logo" 
                 className="h-20 w-20 bg-white rounded-full p-1"
               />
             </div>
@@ -60,19 +60,22 @@ const Footer = () => {
             <h3 className="text-xl font-bold mb-4">Our Sectors</h3>
             <ul className="space-y-2">
               <li>
-                <Link to="/jobs?industry=technology" className="hover:text-recruitment-secondary transition-colors">Technology</Link>
+                <Link to="/jobs?industry=real-estate" className="hover:text-recruitment-secondary transition-colors">Real Estate</Link>
               </li>
               <li>
-                <Link to="/jobs?industry=finance" className="hover:text-recruitment-secondary transition-colors">Finance & Accounting</Link>
+                <Link to="/jobs?industry=emiratization" className="hover:text-recruitment-secondary transition-colors">Emiratization</Link>
               </li>
               <li>
-                <Link to="/jobs?industry=engineering" className="hover:text-recruitment-secondary transition-colors">Engineering</Link>
+                <Link to="/jobs?industry=finance" className="hover:text-recruitment-secondary transition-colors">Finance</Link>
               </li>
               <li>
-                <Link to="/jobs?industry=sales" className="hover:text-recruitment-secondary transition-colors">Sales & Marketing</Link>
+                <Link to="/jobs?industry=tourism" className="hover:text-recruitment-secondary transition-colors">Tourism</Link>
               </li>
               <li>
-                <Link to="/jobs?industry=executive" className="hover:text-recruitment-secondary transition-colors">Executive Search</Link>
+                <Link to="/jobs?industry=law" className="hover:text-recruitment-secondary transition-colors">Law</Link>
+              </li>
+              <li>
+                <Link to="/jobs?industry=education" className="hover:text-recruitment-secondary transition-colors">Education</Link>
               </li>
             </ul>
           </div>
@@ -83,12 +86,12 @@ const Footer = () => {
             <ul className="space-y-3">
               <li className="flex items-center">
                 <Phone size={18} className="mr-2" />
-                <span>+971 (0) 4 267 2726</span>
+                <span>+971 58 595 5710</span>
               </li>
               <li className="flex items-center">
                 <Mail size={18} className="mr-2" />
-                <a href="mailto:info@harriesgroup.com" className="hover:text-recruitment-secondary transition-colors">
-                  info@harriesgroup.com
+                <a href="mailto:jobs@harriesgroup.com" className="hover:text-recruitment-secondary transition-colors">
+                  jobs@harriesgroup.com
                 </a>
               </li>
               <li className="flex items-start">
@@ -100,7 +103,7 @@ const Footer = () => {
         </div>
 
         <div className="border-t border-white/20 mt-10 pt-6 text-center">
-          <p>&copy; {new Date().getFullYear()} Harries Group. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Harries Recruit. All rights reserved.</p>
         </div>
       </div>
     </footer>;

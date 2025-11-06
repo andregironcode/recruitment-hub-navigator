@@ -24,7 +24,7 @@ const AboutSection = () => {
         duration: 0.7
       }}>
           <div className="lg:w-1/2">
-            <motion.h2 className="text-3xl md:text-4xl font-bold text-recruitment-primary mb-6" initial={{
+          <motion.h2 className="text-3xl md:text-4xl font-bold text-recruitment-primary mb-6" initial={{
             opacity: 0,
             y: 20
           }} whileInView={{
@@ -35,7 +35,7 @@ const AboutSection = () => {
           }} transition={{
             duration: 0.5,
             delay: 0.1
-          }}>About the Harries Group</motion.h2>
+          }}>About Harries Recruit</motion.h2>
             
             <motion.div className="space-y-4" initial={{
             opacity: 0,

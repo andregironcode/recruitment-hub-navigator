@@ -8,28 +8,21 @@ import { motion } from 'framer-motion';
 const stats = [
   {
     id: 1,
-    stat: '25+',
-    title: 'Years',
+    stat: '50+',
+    title: 'Combined Years',
     description: 'Industry experience',
     icon: Briefcase,
   },
   {
     id: 2,
-    stat: '1000+',
-    title: 'Clients',
-    description: 'Trusted partnerships',
-    icon: Building,
-  },
-  {
-    id: 3,
-    stat: '60+',
+    stat: '10+',
     title: 'Team',
     description: 'Recruitment specialists',
     icon: Users,
   },
   {
-    id: 4,
-    stat: '97%',
+    id: 3,
+    stat: '100%',
     title: 'Retention',
     description: 'Client satisfaction rate',
     icon: Award,
@@ -61,11 +54,11 @@ const CompanyStats = () => {
             Our Recruitment Expertise
           </h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Harries Recruitment has established a track record of excellence with our dedicated approach to talent acquisition.
+            Harries Recruit has established a track record of excellence with our dedicated approach to talent acquisition.
           </p>
         </motion.div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
           {stats.map((item, index) => (
             <motion.div
               key={item.id}

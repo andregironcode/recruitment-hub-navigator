@@ -7,14 +7,14 @@ const teamMembers = [{
   name: 'Heather',
   role: 'Chief Executive Officer',
   image: '/lovable-uploads/55c7a32e-42dd-4bbd-be07-450a61145ce5.png',
-  bio: 'Heather has over 20 years of experience in recruitment and education. She founded the Heather Harries Group with a vision to transform how businesses approach talent acquisition.',
+  bio: 'Heather has over 20 years of experience in recruitment and education. She founded Harries Recruit with a vision to transform how businesses approach talent acquisition.',
   tag: 'Founder'
 }, {
   name: 'James',
-  role: 'Business Development',
+  role: 'Managing Director',
   image: '/lovable-uploads/08380770-d0b9-4afb-90ce-7816e675abdf.png',
   bio: 'James oversees business development initiatives and strategic partnerships. With his background in finance and operations, he helps clients optimize their recruitment processes.',
-  tag: 'Strategy'
+  tag: 'Leadership'
 }, {
   name: 'Mhairi',
   role: 'Communications',

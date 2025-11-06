@@ -51,7 +51,7 @@ const Contact = () => {
                     </div>
                     <div>
                       <h3 className="font-medium text-recruitment-dark">Phone</h3>
-                      <p className="text-gray-600">+44 (0) 1234 567890</p>
+                      <p className="text-gray-600">+971 58 595 5710</p>
                       <p className="text-gray-600">Mon-Fri, 9am-5:30pm</p>
                     </div>
                   </div>
@@ -62,8 +62,7 @@ const Contact = () => {
                     </div>
                     <div>
                       <h3 className="font-medium text-recruitment-dark">Email</h3>
-                      <p className="text-gray-600">info@harriesrecruitment.com</p>
-                      <p className="text-gray-600">careers@harriesrecruitment.com</p>
+                      <p className="text-gray-600">jobs@harriesgroup.com</p>
                     </div>
                   </div>
                   
@@ -188,7 +187,7 @@ const Contact = () => {
                       required
                     />
                     <label htmlFor="consent" className="ml-2 block text-sm text-gray-600">
-                      I consent to Harries Recruitment collecting and storing my data to process my inquiry. *
+                      I consent to Harries Recruit collecting and storing my data to process my inquiry. *
                     </label>
                   </div>
                   

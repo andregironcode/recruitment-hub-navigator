@@ -9,10 +9,10 @@ import { supabase } from '@/integrations/supabase/client';
 // Define our industry data but without hardcoded counts
 const industriesData = [
   { 
-    id: 'finance', 
-    name: 'Finance', 
-    description: 'Banking, accounting, financial analysis, and senior finance leadership positions.',
-    icon: '/icons/emiratization.svg'
+    id: 'real-estate', 
+    name: 'Real Estate', 
+    description: 'Property management, real estate agents, development, and construction specialists.',
+    icon: '/icons/real-estate.svg'
   },
   { 
     id: 'emiratization', 
@@ -21,22 +21,22 @@ const industriesData = [
     icon: '/icons/emiratization.svg'
   },
   { 
-    id: 'real-estate', 
-    name: 'Real Estate', 
-    description: 'Property management, real estate agents, development, and construction specialists.',
-    icon: '/icons/real-estate.svg'
-  },
-  { 
-    id: 'law', 
-    name: 'Law', 
-    description: 'Legal professionals, paralegals, attorneys, and corporate legal advisors.',
-    icon: '/icons/law.svg'
+    id: 'finance', 
+    name: 'Finance', 
+    description: 'Banking, accounting, financial analysis, and senior finance leadership positions.',
+    icon: '/icons/finance.svg'
   },
   { 
     id: 'tourism', 
     name: 'Tourism', 
     description: 'Hospitality, travel management, tourism operations, and customer service roles.',
     icon: '/icons/tourism.svg'
+  },
+  { 
+    id: 'law', 
+    name: 'Law', 
+    description: 'Legal professionals, paralegals, attorneys, and corporate legal advisors.',
+    icon: '/icons/law.svg'
   },
   { 
     id: 'education', 
