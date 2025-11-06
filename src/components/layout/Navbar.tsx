@@ -41,9 +41,9 @@ const Navbar = () => {
             <Link to="/contact" className="text-recruitment-dark hover:text-recruitment-primary transition-colors px-3 py-2">
               Contact
             </Link>
-            <Link to="/admin">
+            <Link to="/auth">
               <Button variant="outline" className="ml-4 border-recruitment-primary text-recruitment-primary hover:bg-recruitment-primary hover:text-white">
-                Client Portal
+                Admin Login
               </Button>
             </Link>
           </div>
@@ -97,11 +97,11 @@ const Navbar = () => {
               Contact
             </Link>
             <Link 
-              to="/admin" 
+              to="/auth" 
               className="text-recruitment-dark hover:text-recruitment-primary px-3 py-2"
               onClick={() => setIsMenuOpen(false)}
             >
-              Client Portal
+              Admin Login
             </Link>
           </div>
         </div>
