@@ -15,3 +15,64 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     autoRefreshToken: true,
   }
 });
+
+export const RESUME_BUCKET_ID = 'resumes';
+
+export const checkStorageBuckets = async () => {
+  try {
+    const { data, error } = await supabase.storage.getBucket(RESUME_BUCKET_ID);
+    
+    if (error) {
+      return { success: false, error, bucketInfo: null };
+    }
+    
+    return { success: true, error: null, bucketInfo: data };
+  } catch (error) {
+    return { 
+      success: false, 
+      error: error instanceof Error ? error : new Error('Unknown error'),
+      bucketInfo: null 
+    };
+  }
+};
+
+export const uploadResumeFile = async (file: File) => {
+  try {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+    const filePath = fileName;
+
+    const { data, error } = await supabase.storage
+      .from(RESUME_BUCKET_ID)
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from(RESUME_BUCKET_ID)
+      .getPublicUrl(filePath);
+
+    // Extract text content from file if possible
+    let content = '';
+    if (file.type === 'application/pdf' || file.type.includes('text')) {
+      content = await file.text().catch(() => '');
+    }
+
+    return {
+      url: publicUrl,
+      content,
+      error: null
+    };
+  } catch (error) {
+    return {
+      url: '',
+      content: '',
+      error: error instanceof Error ? error : new Error('Upload failed')
+    };
+  }
+};

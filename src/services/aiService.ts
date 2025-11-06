@@ -77,7 +77,7 @@ export async function getExistingAnalysis(applicationId: number): Promise<Resume
 
     return {
       educationLevel: data.education_level || 'Not available',
-      yearsExperience: data.years_experience || 'Not available',
+      yearsExperience: data.years_experience ? String(data.years_experience) : 'Not available',
       skillsMatch: data.skills_match || 'Low',
       keySkills: data.key_skills || [],
       missingRequirements: data.missing_requirements || [],
@@ -93,10 +93,24 @@ export async function getExistingAnalysis(applicationId: number): Promise<Resume
 
 export async function getJobApplicationsAnalyses(jobId: number): Promise<Record<number, ResumeAnalysis>> {
   try {
+    // First get all applications for this job
+    const { data: applications, error: appError } = await supabase
+      .from('applications')
+      .select('id')
+      .eq('job_id', jobId);
+
+    if (appError || !applications || applications.length === 0) {
+      console.error('Error fetching applications:', appError);
+      return {};
+    }
+
+    const applicationIds = applications.map(app => app.id);
+
+    // Then get analyses for those applications
     const { data, error } = await supabase
       .from('application_analyses')
       .select('*')
-      .eq('job_id', jobId);
+      .in('application_id', applicationIds);
 
     if (error) {
       console.error('Error fetching analyses:', error);
@@ -108,7 +122,7 @@ export async function getJobApplicationsAnalyses(jobId: number): Promise<Record<
     for (const analysis of data || []) {
       analysesMap[analysis.application_id] = {
         educationLevel: analysis.education_level || 'Not available',
-        yearsExperience: analysis.years_experience || 'Not available',
+        yearsExperience: analysis.years_experience ? String(analysis.years_experience) : 'Not available',
         skillsMatch: analysis.skills_match || 'Low',
         keySkills: analysis.key_skills || [],
         missingRequirements: analysis.missing_requirements || [],
