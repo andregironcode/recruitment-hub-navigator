@@ -50,17 +50,21 @@ const AboutSection = () => {
             delay: 0.2
           }}>
               <p className="text-lg text-gray-600">
-                Business disrupter and innovator, the group has grown based on innovative thinking underwritten with old-fashioned values. The brand values are integrity, honesty, service, value and above all outstanding customer care.
+                Founded by James Harries, Harries Recruitment was built from a passion for connecting exceptional talent with leading real estate firms across Dubai.
               </p>
               
               <div className="h-1 w-20 bg-recruitment-primary/30 rounded-full my-6"></div>
               
               <p className="text-lg text-gray-600">
-                In a world where people have become numbers, our customers are our strategic partners, and their success is our success.
+                Having lived in Dubai for over 20 years, James brings a deep understanding of the city's real estate market and its people. With more than five years of experience in executive real estate recruitment, he has partnered with over 100 firms across the UAE — successfully placing candidates in roles ranging from administrative support to senior leadership and C-suite positions.
               </p>
               
               <p className="text-lg text-gray-600">
-                The company has grown through horizontal integration from education, to consultancy, to human resource solutions, from the earliest interaction with our customers we recognize their value and we have always referred to human resources as human assets as we believe this is exactly what they are.
+                What sets Harries Recruitment apart is our personal approach. We go beyond simply matching skills to job titles — we focus on understanding company culture, long-term potential, and the ambitions that drive both clients and candidates.
+              </p>
+              
+              <p className="text-lg text-gray-600">
+                We're proud to be a boutique recruitment partner that values relationships over transactions — helping firms find the talent that truly moves their business forward.
               </p>
             </motion.div>
           </div>
